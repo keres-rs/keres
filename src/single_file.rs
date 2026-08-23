@@ -1,110 +1,159 @@
-use crate::crypto;
-use crate::error::{Error, Result};
-use sha2::{Digest, Sha256};
-use std::fs;
-use std::io::{Read, Write};
+//! Single-file encryption (the `.krf` container).
+//!
+//! A `.krf` file is a universal krypton container (see [`crate::container`])
+//! with password-based key derivation (`kind = 1`) and payload type
+//! `file`. The original filename travels inside the authenticated trailer.
+//!
+//! Files are processed in 64 KiB chunks with constant memory usage, so
+//! files of any size can be encrypted without loading them into RAM.
+
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use zeroize::Zeroize;
 
-pub const MAGIC_HEADER: &[u8; 9] = b"KRYPTON2\n";
-pub const SALT_SIZE: usize = 22;
-pub const NONCE_SIZE: usize = 12;
-pub const TAG_SIZE: usize = 16;
+use crate::container::{self, KeyDerivation, PayloadType};
 
-pub struct EncryptedFile {
-    pub salt: [u8; SALT_SIZE],
-    pub nonce: [u8; NONCE_SIZE],
-    pub tag: [u8; TAG_SIZE],
-    pub ciphertext: Vec<u8>,
-}
+use crate::error::{Error, Result};
 
+/// Encrypts `input` into a `.krf` container.
+///
+/// * `password` - the encryption password.
+/// * `input` - file to encrypt.
+/// * `output` - destination path; when `None` a random-looking hashed name
+///   ending in `.krf` is generated (the original filename never appears on
+///   disk unencrypted).
+///
+/// Returns the path of the written container. Output is produced atomically
+/// (temp file + rename) with owner-only permissions on Unix.
+///
+/// ```no_run
+/// use std::path::Path;
+/// let out = krypton::encrypt_file("correct horse", Path::new("document.pdf"), None).unwrap();
+/// ```
 pub fn encrypt_file(password: &str, input: &Path, output: Option<&Path>) -> Result<PathBuf> {
     let input_path = input
         .canonicalize()
-        .map_err(|_| Error::FileNotFound(input.to_string_lossy().to_string()))?;
+        .map_err(|_| Error::invalid_name(input.display()))?;
+    if !input_path.is_file() {
+        return Err(Error::invalid_name(input.display()));
+    }
 
     let original_name = input_path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
+        .unwrap_or_else(|| "unknown".into());
 
-    let mut file = fs::File::open(&input_path)?;
-    let mut plaintext = Vec::new();
-    file.read_to_end(&mut plaintext)?;
+    let mut argon_salt = [0u8; container::SALT_LEN];
+    let mut object_salt = [0u8; container::SALT_LEN];
+    crate::crypto::fill_random(&mut argon_salt);
+    crate::crypto::fill_random(&mut object_salt);
 
-    let mut name_bytes = original_name.as_bytes().to_vec();
-    name_bytes.push(0x00);
-    name_bytes.extend_from_slice(&plaintext);
-    plaintext.zeroize();
-
-    let salt = crypto::generate_salt();
-    let mut key = crypto::derive_key(password, &salt)?;
-
-    let encrypted = crypto::encrypt_with_key(&name_bytes, &key)?;
-    name_bytes.zeroize();
-    key.zeroize();
+    let kd = KeyDerivation::Password {
+        argon_salt,
+        object_salt,
+        params: crate::kdf::KdfParams::new(),
+    };
 
     let output_path = match output {
         Some(p) => p.to_path_buf(),
         None => {
+            // Random-looking name from public randomness; not secret, just opaque.
+            use sha2::{Digest, Sha256};
             let mut hasher = Sha256::new();
-            hasher.update(&salt);
-            hasher.update(original_name.as_bytes());
-            let hash = hasher.finalize();
-            PathBuf::from(format!("{:x}.krf", hash))
+            hasher.update(argon_salt);
+            hasher.update(object_salt);
+            PathBuf::from(format!("{:x}.krf", hasher.finalize()))
         }
     };
 
-    let mut output_file = fs::File::create(&output_path)?;
-    output_file.write_all(MAGIC_HEADER)?;
-    output_file.write_all(&salt)?;
-    output_file.write_all(&encrypted.nonce)?;
-    output_file.write_all(&encrypted.tag)?;
+    let tmp_path = crate::fsutil::sibling_temp_path(&output_path);
+    let result = (|| -> Result<()> {
+        let mut out_file = File::create(&tmp_path)?;
+        crate::fsutil::restrict_perms(&tmp_path);
 
-    let data_len = (encrypted.ciphertext.len() as u32).to_le_bytes();
-    output_file.write_all(&data_len)?;
-    output_file.write_all(&encrypted.ciphertext)?;
+        let mut src = File::open(&input_path)?;
+        {
+            let mut w = BufWriter::new(&mut out_file);
+            container::write_container(
+                &mut w,
+                &kd,
+                Some(password),
+                None,
+                PayloadType::File,
+                b"",
+                Some(&mut src),
+                Some(&original_name),
+            )?;
+            w.flush()?;
+        }
+        out_file.sync_all()?;
+        drop(out_file);
 
-    Ok(output_path)
+        #[cfg(windows)]
+        if output_path.exists() {
+            std::fs::remove_file(&output_path)?;
+        }
+        std::fs::rename(&tmp_path, &output_path)?;
+        crate::fsutil::restrict_perms(&output_path);
+        crate::fsutil::sync_dir(output_path.parent().unwrap_or_else(|| Path::new(".")));
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => Ok(output_path),
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            Err(e)
+        }
+    }
 }
 
+/// Decrypts a `.krf` container into `output`.
+///
+/// Returns the original filename recovered from the authenticated trailer.
+///
+/// Security notes:
+/// * The plaintext is written via temp-file + rename; an interrupted
+///   decryption never leaves a half-written file behind.
+/// * The returned filename originates inside the encrypted container. Treat
+///   it as untrusted data; if used to build filesystem paths, pass it through
+///   [`crate::sanitize::sanitize_stored_name`] first.
 pub fn decrypt_file(password: &str, input: &Path, output: &Path) -> Result<String> {
-    let mut file = fs::File::open(input)?;
+    let file = BufReader::new(File::open(input)?);
 
-    let mut magic = [0u8; 9];
-    file.read_exact(&mut magic)?;
-    if &magic != MAGIC_HEADER {
-        return Err(Error::InvalidVault);
+    let tmp_path = crate::fsutil::sibling_temp_path(output);
+    let outcome = (|| -> Result<String> {
+        let tmp = File::create(&tmp_path)?;
+        crate::fsutil::restrict_perms(&tmp_path);
+        let mut sink = BufWriter::new(tmp);
+
+        let trailer = container::read_container(
+            file,
+            Some(password),
+            None,
+            PayloadType::File,
+            b"",
+            |chunk| sink.write_all(chunk).map_err(Error::from),
+        )?;
+        sink.flush()?;
+        drop(sink);
+
+        let name = trailer.name.ok_or(Error::MalformedPayload)?;
+
+        #[cfg(windows)]
+        if output.exists() {
+            std::fs::remove_file(output)?;
+        }
+        std::fs::rename(&tmp_path, output)?;
+        crate::fsutil::sync_dir(output.parent().unwrap_or_else(|| Path::new(".")));
+        Ok(name)
+    })();
+
+    match outcome {
+        Ok(name) => Ok(name),
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            Err(e)
+        }
     }
-
-    let mut salt = [0u8; SALT_SIZE];
-    let mut nonce = [0u8; NONCE_SIZE];
-    let mut tag = [0u8; TAG_SIZE];
-    let mut data_len_bytes = [0u8; 4];
-    file.read_exact(&mut salt)?;
-    file.read_exact(&mut nonce)?;
-    file.read_exact(&mut tag)?;
-    file.read_exact(&mut data_len_bytes)?;
-
-    let data_len = u32::from_le_bytes(data_len_bytes) as usize;
-    let mut ciphertext = vec![0u8; data_len];
-    file.read_exact(&mut ciphertext)?;
-
-    let mut key = crypto::derive_key(password, &salt)?;
-
-    let decrypted = crypto::decrypt_with_key(&ciphertext, &nonce, &key, &tag)?;
-    key.zeroize();
-    ciphertext.zeroize();
-
-    let sep_idx = decrypted
-        .iter()
-        .position(|&x| x == 0x00)
-        .ok_or(Error::DecryptionFailed)?;
-
-    let original_name = String::from_utf8_lossy(&decrypted[..sep_idx]).to_string();
-    let file_content = &decrypted[sep_idx + 1..];
-
-    fs::write(output, file_content)?;
-
-    Ok(original_name)
 }

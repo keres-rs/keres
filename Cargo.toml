@@ -1,32 +1,27 @@
 [package]
 name = "krypton"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2021"
+rust-version = "1.75"
 authors = ["Yash Sharma"]
-description = "CLI encryption software and a reusable crypto library"
-license = "GPL-3.0"
-repository = "https://github.com/thestaccato/krypton"
+description = "A memory-safe, high-performance Rust library for modern file encryption and secure vaults."
+license = "Apache-2.0"
+repository = "https://github.com/KryptonOSS/krypton"
 keywords = ["encryption", "aes", "cryptography", "vault", "argon2"]
-categories = ["cryptography", "compression"]
-
-[features]
-default = ["cli"]
-cli = ["clap", "rpassword", "directories"]
+categories = ["cryptography", "filesystem"]
+readme = "README.md"
 
 [dependencies]
 aes-gcm = "0.10"
 argon2 = "0.5"
-rand = "0.8"
+hkdf = "0.12"
+sha2 = "0.10"
+subtle = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
 zeroize = { version = "1.7", features = ["derive"] }
-sha2 = "0.10"
-pnet_base = "0.35"
 walkdir = "2.5"
-clap = { version = "4.5", features = ["derive"], optional = true }
-rpassword = { version = "7", optional = true }
-directories = { version = "5", optional = true }
 
 [dev-dependencies]
 tempfile = "3.12"
@@ -34,10 +29,15 @@ tempfile = "3.12"
 [profile.release]
 lto = true
 codegen-units = 1
-panic = "abort"
 strip = true
 
-[[bin]]
-name = "krypton"
-path = "src/main.rs"
-required-features = ["cli"]
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[lints.clippy]
+all = "warn"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
