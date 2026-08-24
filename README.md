@@ -1,164 +1,115 @@
 # Krypton
 
-A CLI tool for creating encrypted vaults and single-file encryption with **file's metadata protection**.
+A high-quality Rust **library** for encrypted vaults and single-file encryption with full **metadata protection** - built on AES-256-GCM and Argon2id.
 
-Krypton is also a Rust library, other software can use its encryption primitives without reimplementing AES-256-GCM or Argon2id.
+**[Full technical documentation](https://kryptonoss.github.io/documentation)**
+
+See [SECURITY](https://kryptonoss.github.io/security) for the threat model, design decisions and known limitations.
+
+See [ROADMAP](https://kryptonoss.github.io/roadmap) for the upcoming planned work.
+
+If you are interested in contributing to the project, contribution rules are mentioned in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Library Usage
-
-```toml
-[dependencies]
-krypton = { version = "0.2", default-features = false }
-```
 
 ```rust
 use krypton::{encrypt_file, decrypt_file, Vault};
 use std::path::Path;
 
-let out = encrypt_file("password", Path::new("document.pdf"), None)?;
-let name = decrypt_file("password", Path::new("out.krf"), Path::new("restored.pdf"))?;
+// Single file: filename is encrypted inside the container.
+let out = encrypt_file("correct horse", Path::new("document.pdf"), None)?;
+let original_name = decrypt_file("correct horse", &out, Path::new("restored.pdf"))?;
+assert_eq!(original_name, "document.pdf");
 
+// Multi-file encrypted vault.
 let mut vault = Vault::new("myvault".into());
-vault.init("password")?;
-vault.unlock("password")?;
+vault.init("correct horse")?;
+vault.unlock("correct horse")?;
 vault.add(Path::new("secret.pdf"), None)?;
-vault.add(Path::new("photos"), None)?;
-let files = vault.list()?;
-vault.extract("secret.pdf", Path::new("./out"))?;
-vault.change_password("password", "newpassword")?;
+vault.add(Path::new("photos"), Some("photos"))?; // whole trees
+let entries = vault.list()?;
+vault.extract("photos", Path::new("./restored"))?;
+vault.change_password("correct horse", "new password")?; // no re-encryption needed
 vault.lock();
 ```
 
-The library exposes:
-- `krypton::encrypt_file` / `decrypt_file` — single file .krf format
-- `krypton::Vault` — multi-file encrypted vault container
-- `krypton::crypto` — low-level AES-256-GCM + Argon2id primitives
-- `krypton::Error` / `Result` — error types
+### Public API
 
-CLI dependencies (`clap`, `rpassword`) are optional; library users disable them with `default-features = false`.
+| Module | Contents |
+|---|---|
+| `krypton::*` | `encrypt_file` / `decrypt_file` (`.krf` containers), `Vault`, `EntryInfo`, `IntegrityReport` |
+| `krypton::crypto` | Low-level primitives: `Key`, `seal`/`open` (AAD), `derive_key`, HKDF subkeys, constant-time compare |
+| `krypton::kdf` | `KdfParams` — Argon2id parameters with validation bounds |
+| `krypton::sanitize` | Entry-name validation / traversal defense |
+| `krypton::error` | `Error`, `Result` |
 
-## CLI Usage
-
-Install:
-
-```bash
-cargo install krypton
-```
-
-### Single File Mode
-
-```bash
-# Encrypt — filename hidden
-krypton encrypt taxes2024.pdf
-# Output: 3b736a01...431.krf (random hashed name)
-
-# Decrypt — recovers original filename
-krypton decrypt 3b736a01...431.krf output.pdf
-# Decrypted 'taxes2024.pdf' to: output.pdf
-```
-
-### Vault Mode
-
-```bash
-# Create vault
-krypton init myvault
-
-# Add files (filename hidden in vault)
-krypton add myvault secret.pdf
-krypton add myvault photos/
-
-# List (shows original names — requires password)
-krypton list myvault
-
-# Extract
-krypton extract myvault secret.pdf ./decrypted.pdf
-
-# Remove
-krypton remove myvault secret.pdf
-
-# Change password
-krypton change-password myvault
-```
-
-### Password Options
-
-```bash
-# Interactive (default)
-krypton encrypt file.txt
-
-# Via environment variable
-KRYPTON_PASSWORD="secret" krypton encrypt file.txt
-```
+Run `cargo doc --open` for full documentation with examples on every public item.
 
 ## Security Features
 
-### Encryption Standards
-- **Algorithm**: AES-256-GCM (authenticated encryption)
-- **Key Derivation**: Argon2id (memory-hard, GPU-resistant)
-- **Parameters**: Argon2id with 64MB memory, 4 iterations, 4 parallelism
+- **AES-256-GCM** authenticated encryption for every byte of ciphertext
+- **Argon2id** key derivation (64 MiB, t=4) with parameters *stored in each container*, so defaults can evolve without breaking old files
+- **Per-object subkeys** via HKDF-SHA256 — every file gets an independent content key
+- **Deterministic counter nonces** per chunk — eliminates random-nonce birthday collisions on large files and makes reordering detectable
+- **AAD everywhere** — chunk index and record context are bound into each AEAD operation; truncation, splicing and extension are all detected
+- **Streaming** — 64 KiB chunks with constant memory use; files of any size
+- **Metadata privacy** — original filenames never appear unencrypted; `.krf` outputs get random hashed names
+- **Hardened memory** — keys live in zeroizing buffers, scrubbed on drop; `#![forbid(unsafe_code)]`
+- **Crash safety** — configs, manifests and plaintext outputs are written via temp file + rename; interrupted operations never leave half-written data or bricked vaults
+- **Traversal defense** — names recovered from containers are sanitized before touching the filesystem
+- **One universal container format** — `.krf` files, vault blobs and manifests share a single envelope; new object types are new payload types, never new formats
 
-### Metadata Protection
-- **Filename Encryption**: All filenames are hashed and hidden
-- **File Content**: Encrypted with unique nonces per chunk
-- **Key Derivation**: Salt prevents rainbow table attacks
-- **Memory Security**: Sensitive data zeroed after use
+## File Format
 
-## File Format (.krf)
+Every object is a *krypton container*:
 
 ```
-KRYPTON2\n      # Magic header (9 bytes)
-[22 bytes]      # Salt
-[12 bytes]      # Nonce
-[16 bytes]      # Authentication tag
-[4 bytes]       # Ciphertext length
-[ciphertext]    # Encrypted [filename\0content]
+"KRYPTON\0"       magic (8 bytes, never changes)
+[u16 LE]          envelope version (currently 1)
+[u8 kind]         key derivation:
+                    0 = HKDF(master key, object salt[32])          — vault objects
+                    1 = Argon2id(password, salt[32], params[12])
+                        then HKDF with object salt[32]             — .krf files
+[len u32][ct‖tag] …   chunk records (64 KiB plaintext each)
+[00000000]        end-of-chunks marker
+[len u32][ct‖tag] authenticated trailer: {type: file|directory|manifest,
+                                           name?, size, chunk_count}
 ```
 
-### Filename Protection
-- Original filename is **encrypted inside the ciphertext**
-- Output filename is a random hash (e.g., `3b73...431.krf`)
-- No metadata leakage, even filename size is hidden
-- Decryption recovers original filename automatically
+Header bytes are bound to key derivation; the payload type is bound into
+every record's AAD, so records cannot be transplanted between containers.
 
-## Vault Structure
+### Vault
 
 ```
 vault/
-├── vault.config        # Encrypted master key + parameters
-└── d/                  # Encrypted files
-    ├── .manifest.enc   # Encrypted file index (names + metadata)
-    └── [hash]/[hash].enc  # Hashed filenames — completely hidden
+├── vault.config        JSON v2: wrapped master key + KDF params (atomic writes)
+└── d/
+    ├── .manifest.enc   encrypted index incl. directory child lists
+    └── <hash>/<hash>.enc  per-entry blobs
 ```
 
-### Vault Filename Protection
-- Original filenames are hashed with master key
-- Original names only visible after unlock + list command
-- Even the vault owner sees clean names only when authenticated
+Entry paths are derived from `SHA256(master_key ‖ path)`; blob contents use per-entry subkeys. Directory removal deletes the entire subtree — blobs and manifest records alike.
 
-## Security Comparison
+## Key Hierarchy
 
-| Feature | Krypton | Cryptomator | GPG | 7-Zip |
-|---------|---------|---------|-----|-------|
-| Content encryption | ✅ AES-256-GCM | ✅ AES-256-GCM | ✅ AES-256 | ✅ AES-256 |
-| Filename hidden | ✅ **YES** | ✅ **YES** | ❌ No | ❌ No |
-| Key derivation | ✅ Argon2id | ⚠️ PBKDF2 | ⚠️ PBKDF2 | ⚠️ PBKDF2 |
-
-## Architecture
-
-### Key Hierarchy
 ```
-User Password
-     │
-     ▼
-Argon2id(salt, password) → Derived Key
-     │
-     ▼
-AES-256-GCM(derived_key, master_key) → vault.config
-     │
-     ▼
-Master Key (32 bytes)
-     │
-     ├──► Encrypt/decrypt all vault files
-     │
-     └──► Hash filenames (SHA256 keyed with master key)
+Password ──Argon2id(salt) -> KEK ──AES-GCM-wrap -> vault.config holds Master Key -> SHA256(master ‖ path) → blob location
+                                                                    │ 
+                                            HKDF(master, per-file salt) → content key
+                                                                    │
+                                            counter nonces + AAD(index) → AES-GCM chunks
 ```
+
+Changing the password only re-wraps the master key — stored data is never re-encrypted.
+
+## Development
+
+```bash
+cargo test         # 55 tests: unit, integration, doc examples
+cargo clippy       # clean
+```
+
+## License
+
+Licensed under [Apache-2.0](LICENSE).
