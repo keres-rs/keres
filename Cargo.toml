@@ -11,6 +11,9 @@ keywords = ["encryption", "aes", "cryptography", "vault", "argon2"]
 categories = ["cryptography", "filesystem"]
 readme = "README.md"
 
+[lib]
+name = "krypton"
+
 [dependencies]
 aes-gcm = "0.10"
 argon2 = "0.5"
