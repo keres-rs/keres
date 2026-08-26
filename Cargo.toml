@@ -1,12 +1,12 @@
 [package]
 name = "krypton-core"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 rust-version = "1.75"
 authors = ["Yash Sharma"]
 description = "A memory-safe, high-performance Rust library for modern file encryption and secure vaults."
 license = "Apache-2.0"
-repository = "https://github.com/KryptonOSS/krypton"
+repository = "https://github.com/KryptonOSS/krypton-core"
 keywords = ["encryption", "aes", "cryptography", "vault", "argon2"]
 categories = ["cryptography", "filesystem"]
 readme = "README.md"
