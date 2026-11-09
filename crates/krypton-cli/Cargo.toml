@@ -1,0 +1,27 @@
+[package]
+name = "krypton-cli"
+version = "0.4.2"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Yash Sharma"]
+description = "CLI for krypton: encrypted vaults and single-file encryption with metadata protection"
+license = "Apache-2.0"
+repository = "https://github.com/KryptonOSS/krypton-cli"
+keywords = ["encryption", "cli", "cryptography", "vault"]
+categories = ["command-line-utilities", "cryptography"]
+
+[[bin]]
+name = "krypton"
+path = "src/main.rs"
+
+[dependencies]
+krypton-core = "0.4.2"
+clap = { version = "4.5", features = ["derive"] }
+rpassword = "7"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+opt-level = "z"
