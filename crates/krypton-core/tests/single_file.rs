@@ -17,7 +17,7 @@ fn roundtrip_small_file() {
     let src = dir.path().join("report.txt");
     std::fs::write(&src, b"quarterly numbers: 42").unwrap();
 
-    let out = encrypt_file("pw", &src, None).unwrap();
+    let out = encrypt_file("pw", &src, Some(&dir.path().join("test.krf"))).unwrap();
     assert!(out.extension().unwrap() == "krf");
 
     let dst = dir.path().join("restored.txt");
@@ -47,7 +47,7 @@ fn empty_file_roundtrip() {
     let dir = setup("empty");
     let src = dir.path().join("zero.bin");
     std::fs::write(&src, b"").unwrap();
-    let out = encrypt_file("pw", &src, None).unwrap();
+    let out = encrypt_file("pw", &src, Some(&dir.path().join("test.krf"))).unwrap();
     let dst = dir.path().join("zero.out");
     decrypt_file("pw", &out, &dst).unwrap();
     assert_eq!(std::fs::read(&dst).unwrap(), b"");
@@ -58,7 +58,7 @@ fn unicode_filename_survives() {
     let dir = setup("unicode");
     let src = dir.path().join("ünïcødé-文件.txt");
     std::fs::write(&src, b"data").unwrap();
-    let out = encrypt_file("pw", &src, None).unwrap();
+    let out = encrypt_file("pw", &src, Some(&dir.path().join("test.krf"))).unwrap();
     let dst = dir.path().join("out");
     let name = decrypt_file("pw", &out, &dst).unwrap();
     assert_eq!(name, "ünïcødé-文件.txt");
@@ -69,7 +69,7 @@ fn wrong_password_fails_with_authentication_error() {
     let dir = setup("wrongpw");
     let src = dir.path().join("f.txt");
     std::fs::write(&src, b"x").unwrap();
-    let out = encrypt_file("right", &src, None).unwrap();
+    let out = encrypt_file("right", &src, Some(&dir.path().join("test.krf"))).unwrap();
 
     match decrypt_file("wrong", &out, &dir.path().join("o")) {
         Err(Error::Authentication) => {}
@@ -83,7 +83,7 @@ fn tampering_any_region_detected() {
     let data: Vec<u8> = (0..70_000u32).map(|i| i as u8).collect(); // multi-chunk
     let src = dir.path().join("f.bin");
     std::fs::write(&src, &data).unwrap();
-    let out = encrypt_file("pw", &src, None).unwrap();
+    let out = encrypt_file("pw", &src, Some(&dir.path().join("test.krf"))).unwrap();
 
     let total = out.metadata().unwrap().len() as usize;
     for flip_byte in [9usize, 50, total - 1] {
@@ -105,7 +105,7 @@ fn truncated_container_rejected() {
     let data = vec![7u8; 200_000];
     let src = dir.path().join("f.bin");
     std::fs::write(&src, &data).unwrap();
-    let out = encrypt_file("pw", &src, None).unwrap();
+    let out = encrypt_file("pw", &src, Some(&dir.path().join("test.krf"))).unwrap();
 
     let mut bytes = std::fs::read(&out).unwrap();
     bytes.truncate(bytes.len() / 2);
@@ -120,7 +120,7 @@ fn trailing_garbage_rejected() {
     let dir = setup("garbage");
     let src = dir.path().join("f.txt");
     std::fs::write(&src, b"data").unwrap();
-    let out = encrypt_file("pw", &src, None).unwrap();
+    let out = encrypt_file("pw", &src, Some(&dir.path().join("test.krf"))).unwrap();
 
     let mut bytes = std::fs::read(&out).unwrap();
     bytes.extend_from_slice(b"evil-extra-data");
