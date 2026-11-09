@@ -2,6 +2,8 @@
 title = "The Krypton Documentation"
 authors = ["Yash Sharma"]
 language = "en"
+src = "src"
 
 [output.html]
-git-repository-url = "https://github.com/KryptonOSS/krypton-docs"
+git-repository-url = "https://github.com/KryptonOSS/krypton-core"
+edit-url-template = "https://github.com/KryptonOSS/krypton-core/edit/main/docs/{path}"

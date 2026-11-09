@@ -1,0 +1,23 @@
+[workspace]
+members = ["crates/krypton-core", "crates/krypton-cli"]
+resolver = "2"
+
+[workspace.package]
+version = "0.4.2"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Yash Sharma"]
+license = "Apache-2.0"
+repository = "https://github.com/KryptonOSS/krypton-core"
+
+[workspace.dependencies]
+clap = { version = "4.5", features = ["derive"] }
+rpassword = "7"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.release.package.krypton-cli]
+opt-level = "z"

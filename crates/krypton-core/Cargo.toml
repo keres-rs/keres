@@ -1,12 +1,14 @@
 [package]
 name = "krypton-core"
-version = "0.4.2"
-edition = "2021"
-rust-version = "1.75"
-authors = ["Yash Sharma"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
 description = "A memory-safe, high-performance Rust library for modern file encryption and secure vaults."
-license = "Apache-2.0"
-repository = "https://github.com/KryptonOSS/krypton-core"
+license.workspace = true
+repository.workspace = true
+homepage = "https://kryptonoss.github.io"
+documentation = "https://docs.rs/krypton-core"
 keywords = ["encryption", "aes", "cryptography", "vault", "argon2"]
 categories = ["cryptography", "filesystem"]
 readme = "README.md"
@@ -28,11 +30,6 @@ walkdir = "2.5"
 
 [dev-dependencies]
 tempfile = "3.12"
-
-[profile.release]
-lto = true
-codegen-units = 1
-strip = true
 
 [lints.rust]
 unsafe_code = "forbid"

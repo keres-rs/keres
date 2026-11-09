@@ -1,5 +1,55 @@
 # Contributing
 
-Contributions to Krypton are very welcome. To make the process as smooth as possible for both you and the maintainers we provide some guidelines that we ask you to follow. See Getting started for information on how to set up a suitable development environment and Guidelines for the actual guidelines.
+Contributions to Krypton are welcome. The repository is a single Cargo
+workspace containing the library, CLI, and documentation.
 
-This text is mainly directed at those who would like to make code contributions to Krypton. If you just want to report a bug then first look among the already open issues, if you find one matching yours then feel free to comment on it to add any additional information you may have. If no matching issue exists then go to the new issue page and write a description of your problem. Include as much information as you can.
+## Getting started
+
+```console
+$ git clone https://github.com/KryptonOSS/krypton-core.git
+$ cd krypton-core
+$ cargo test --workspace --all-targets
+```
+
+The workspace layout:
+
+- `crates/krypton-core/` — library: container format, crypto, vault.
+- `crates/krypton-cli/` — the `krypton` binary.
+- `docs/` — this mdBook.
+
+## Before opening a pull request
+
+Run the same gates as CI:
+
+```console
+$ cargo fmt --all -- --check
+$ cargo clippy --workspace --all-targets -- -D warnings
+$ cargo test --workspace --all-targets
+$ cargo doc --workspace --no-deps
+$ mdbook build docs
+```
+
+## Guidelines
+
+- Security first. Do not weaken an authenticated property for convenience.
+  Changes to the format, key derivation, or AAD need a regression test and a
+  documented rationale.
+- New public API needs rustdoc with an example; the library denies missing
+  docs.
+- New behavior needs a test that fails without the change.
+- The container format is versioned. New object kinds are new payload types,
+  never new magics.
+- Keep the CLI a thin wrapper; business logic belongs in `krypton-core`.
+- Prefer small, focused commits.
+
+## Reporting bugs and vulnerabilities
+
+- Bugs and feature requests: open a GitHub issue with a minimal reproducer,
+  OS, Rust version, and the command or API call used.
+- Security issues: do **not** open a public issue. See
+  [SECURITY.md](https://github.com/KryptonOSS/krypton-core/blob/main/SECURITY.md).
+
+## License
+
+By contributing, you agree that your contribution is licensed under
+Apache-2.0 (code) or CC0-1.0 (documentation), matching the files you change.

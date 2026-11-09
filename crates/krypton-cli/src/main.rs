@@ -15,9 +15,7 @@ fn vault_root() -> Result<PathBuf> {
         return Ok(PathBuf::from(dir).join("vaults"));
     }
     match std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
-        Some(home) if !home.is_empty() => {
-            Ok(PathBuf::from(home).join(".krypton").join("vaults"))
-        }
+        Some(home) if !home.is_empty() => Ok(PathBuf::from(home).join(".krypton").join("vaults")),
         Some(_) => Err(Error::Operation(
             "HOME is set but empty; unset it or set KRYPTON_HOME".into(),
         )),
@@ -88,12 +86,12 @@ struct Cli {
 enum Commands {
     /// Initialize a new vault.
     Init {
-        /// Vault name (stored in ~/.krypton/vaults/<name>).
+        /// Vault name (stored in `~/.krypton/vaults/<name>`).
         vault: String,
     },
     /// Add a file or folder to the vault.
     Add {
-        /// Vault name (stored in ~/.krypton/vaults/<name>).
+        /// Vault name (stored in `~/.krypton/vaults/<name>`).
         vault: String,
         /// Path to the file or folder to add.
         path: PathBuf,
@@ -103,19 +101,19 @@ enum Commands {
     },
     /// Remove a file or folder from the vault.
     Remove {
-        /// Vault name (stored in ~/.krypton/vaults/<name>).
+        /// Vault name (stored in `~/.krypton/vaults/<name>`).
         vault: String,
         /// Name of the file/folder in vault.
         name: String,
     },
     /// List vault contents.
     List {
-        /// Vault name (stored in ~/.krypton/vaults/<name>).
+        /// Vault name (stored in `~/.krypton/vaults/<name>`).
         vault: String,
     },
     /// Extract/decrypt a file from the vault.
     Extract {
-        /// Vault name (stored in ~/.krypton/vaults/<name>).
+        /// Vault name (stored in `~/.krypton/vaults/<name>`).
         vault: String,
         /// Name of the file in vault.
         name: String,
@@ -124,12 +122,12 @@ enum Commands {
     },
     /// Change the vault password.
     ChangePassword {
-        /// Vault name (stored in ~/.krypton/vaults/<name>).
+        /// Vault name (stored in `~/.krypton/vaults/<name>`).
         vault: String,
     },
     /// Verify the integrity of all vault entries (full authentication).
     Verify {
-        /// Vault name (stored in ~/.krypton/vaults/<name>).
+        /// Vault name (stored in `~/.krypton/vaults/<name>`).
         vault: String,
     },
     /// Encrypt a single file.

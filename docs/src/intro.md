@@ -1,6 +1,8 @@
 # Introduction to Krypton
 
-A memory-safe, high-performance Rust library and cryptographic utils for modern file encryption and secure vaults using Argon2id and AES-256-GSM with complete metadata protection along with a Universal Container Format for header.
+A memory-safe Rust library and command-line tool for modern file encryption
+and secure vaults, using Argon2id and AES-256-GCM with encrypted filenames
+and a universal container format.
 
 Krypton is built for modern security standards and currently in alpha phase therefore the public API may change in future and may break.
 
@@ -14,17 +16,17 @@ storage modes over one shared cryptographic core:
 
 Both modes share:
 
-- One universal wire format (`src/container.rs`) with a stable magic and
-  structured versioning.
-- One chunk engine (`src/stream.rs`, 64 KiB records).
-- One primitive layer (`src/crypto.rs`): AES-256-GCM, Argon2id,
-  HKDF-SHA256.
+- One universal wire format (`crates/krypton-core/src/container.rs`) with a
+  stable magic and structured versioning.
+- One chunk engine (`crates/krypton-core/src/stream.rs`, 64 KiB records).
+- One primitive layer (`crates/krypton-core/src/crypto.rs`): AES-256-GCM,
+  Argon2id, HKDF-SHA256.
 
-The crate is deliberately small: ~2.5k lines of library code across nine
-modules, no async runtime, no I/O beyond `std::fs`.
+The crate is deliberately small: under 2k lines of library code, no async
+runtime, and no I/O beyond `std::fs`.
 
 ```
-src/
+crates/krypton-core/src/
 ├── lib.rs          crate docs, prelude, re-exports
 ├── error.rs        Error enum (thiserror), Result alias
 ├── crypto.rs       AES-GCM / Argon2id / HKDF / CSPRNG wrappers
@@ -123,8 +125,8 @@ vault.add(Path::new("docs"), Some("docs"))?;
 for e in vault.list()? {
     println!("{} {} bytes", e.name, e.size);
 }
-vault.extract("docs/report.pdf", Path::new("out"))?;
-vault.lock()?;
+vault.extract("docs", Path::new("out"))?;
+vault.lock();
 ```
 
 State machine: `init`/`unlock` require locked state; mutating operations
@@ -133,7 +135,7 @@ state). All fallible APIs return `Result` with the taxonomy above; no
 panics on hostile input (test-enforced).
 
 Module-level documentation in rustdoc mirrors this document; build with
-`cargo doc --open`.
+`cargo doc -p krypton-core --open`.
 
 ---
 
@@ -141,7 +143,7 @@ Module-level documentation in rustdoc mirrors this document; build with
 
 Current suite (all green at time of writing):
 
-- **56 tests**: unit tests per module (crypto roundtrips/AAD binding,
+- **Unit, integration, and doc tests**: unit tests per module (crypto roundtrips/AAD binding,
   container tamper matrix, stream limits, sanitize cases, manifest
   truncation regression, vault lifecycle), integration tests
   (`tests/single_file.rs`, `tests/vault.rs`) covering multi-MB roundtrips,
@@ -149,7 +151,7 @@ Current suite (all green at time of writing):
 - Gates enforced locally and in CI: `cargo test`, `clippy -D warnings`,
   `fmt --check`, `cargo doc` warning-free, `cargo publish --dry-run`.
 - GitHub Actions: test matrix (stable + MSRV 1.75), lint job, docs job,
-  publish-check; CLI repo builds release artifacts.
+  publish-check; the workspace CI also builds the CLI and the docs book.
 
 Notable regression tests born from audits:
 

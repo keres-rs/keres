@@ -1,27 +1,23 @@
 [package]
 name = "krypton-cli"
-version = "0.4.2"
-edition = "2021"
-rust-version = "1.75"
-authors = ["Yash Sharma"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
 description = "CLI for krypton: encrypted vaults and single-file encryption with metadata protection"
-license = "Apache-2.0"
-repository = "https://github.com/KryptonOSS/krypton-cli"
+license.workspace = true
+repository.workspace = true
+homepage = "https://kryptonoss.github.io"
 keywords = ["encryption", "cli", "cryptography", "vault"]
 categories = ["command-line-utilities", "cryptography"]
+readme = "README.md"
 
 [[bin]]
 name = "krypton"
 path = "src/main.rs"
+doc = false
 
 [dependencies]
-krypton-core = "0.4.2"
-clap = { version = "4.5", features = ["derive"] }
-rpassword = "7"
-
-[profile.release]
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
-opt-level = "z"
+krypton-core = { path = "../krypton-core", version = "0.4.2" }
+clap.workspace = true
+rpassword.workspace = true

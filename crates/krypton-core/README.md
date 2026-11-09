@@ -1,14 +1,19 @@
-# Krypton
+# Krypton Core
 
-A high-quality Rust **library** for encrypted vaults and single-file encryption with full **metadata protection** - built on AES-256-GCM and Argon2id.
+The Rust engine behind Krypton: encrypted vaults and single-file encryption
+with encrypted filenames, built on AES-256-GCM and Argon2id.
 
-**[Full technical documentation](https://kryptonoss.github.io/documentation)**
+This crate is part of the
+[Krypton monorepo](https://github.com/KryptonOSS/krypton-core).
 
-See [SECURITY](https://kryptonoss.github.io/security) for the threat model, design decisions and known limitations.
+**[Documentation](https://github.com/KryptonOSS/krypton-core/blob/main/docs/src/intro.md)**
+· **[Security](https://github.com/KryptonOSS/krypton-core/blob/main/SECURITY.md)**
+· **[Roadmap](https://github.com/KryptonOSS/krypton-core/blob/main/ROADMAP.md)**
+· **[Contributing](https://github.com/KryptonOSS/krypton-core/blob/main/CONTRIBUTING.md)**
 
-See [ROADMAP](https://kryptonoss.github.io/roadmap) for the upcoming planned work.
-
-If you are interested in contributing to the project, contribution rules are mentioned in [CONTRIBUTING.md](CONTRIBUTING.md).
+See [SECURITY](https://github.com/KryptonOSS/krypton-core/blob/main/SECURITY.md)
+for the threat model, design decisions, and known limitations. In particular,
+entry counts, directory shape, and approximate file sizes remain observable.
 
 ## Library Usage
 
@@ -105,11 +110,14 @@ Changing the password only re-wraps the master key — stored data is never re-e
 
 ## Development
 
+From the workspace root:
+
 ```bash
-cargo test         # 55 tests: unit, integration, doc examples
-cargo clippy       # clean
+cargo test -p krypton-core          # unit, integration, and doc tests
+cargo clippy -p krypton-core --all-targets -- -D warnings
 ```
 
 ## License
 
-Licensed under [Apache-2.0](LICENSE).
+Licensed under
+[Apache-2.0](https://github.com/KryptonOSS/krypton-core/blob/main/LICENSE).

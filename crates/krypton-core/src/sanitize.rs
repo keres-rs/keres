@@ -3,7 +3,8 @@
 //! Encrypted containers store filenames. A malicious container (or a hostile
 //! peer) can embed names like `../../.ssh/id_rsa`; anything reconstructed
 //! from stored names and joined onto a user-supplied destination must pass
-//! through [`sanitize_entry_name`] first.
+//! through [`sanitize_stored_name`](crate::sanitize::sanitize_stored_name)
+//! first.
 
 use crate::error::{Error, Result};
 

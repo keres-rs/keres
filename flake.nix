@@ -1,5 +1,5 @@
 {
-  description = "Krypton";
+  description = "Krypton: encrypted files, vaults, and CLI";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -12,6 +12,7 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
       in
       {
         # Development shell: enter with `nix develop`
@@ -22,6 +23,7 @@
             clippy
             rustfmt
             rust-analyzer
+            mdbook
           ];
 
           RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
@@ -31,13 +33,21 @@
           '';
         };
 
-        # Build the library crate: `nix build`
+        # Build the workspace (library + CLI): `nix build`
         packages.krypton = pkgs.rustPlatform.buildRustPackage {
           pname = "krypton";
-          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
+          inherit version;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
+          meta = with pkgs.lib; {
+            description = "Encrypted files, vaults, and CLI";
+            homepage = "https://github.com/KryptonOSS/krypton-core";
+            license = licenses.apache2;
+            mainProgram = "krypton";
+            platforms = platforms.unix;
+          };
         };
+        packages.default = self.packages.${system}.krypton;
 
         checks.krypton-tests = pkgs.rustPlatform.buildRustPackage {
           pname = "krypton-tests";

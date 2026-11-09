@@ -35,7 +35,7 @@ use crate::error::{Error, Result};
 pub const CHUNK_SIZE: usize = 64 * 1024;
 /// Upper bound accepted for a trailer record (hostile-input guard).
 pub(crate) const MAX_TRAILER_LEN: usize = 1024 * 1024;
-/// Sanity cap on chunk count (~1 PiB with 64 KiB chunks).
+/// Sanity cap on chunk count (~1 TiB with 64 KiB chunks).
 const MAX_CHUNK_COUNT: u32 = 1 << 24;
 
 /// Reserved nonce used exclusively by the trailer record.

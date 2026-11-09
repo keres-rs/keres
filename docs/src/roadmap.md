@@ -17,8 +17,9 @@ property will never be accepted for a compatibility or convenience win.
   increasing generation counter in the vault config and sign each manifest
   save with it, so restoring an old snapshot of the vault directory is at
   least *detectable* on next unlock.
-- **CI hardening** — Windows job (rename semantics differ), MSRV job,
-  `cargo-audit` / `cargo-deny` supply-chain checks, and release artifacts.
+- **CI hardening** — Windows and macOS jobs (rename and permission
+  semantics differ), `cargo-audit` / `cargo-deny` supply-chain checks, and
+  signed release artifacts.
 
 ## Next (0.5.x)
 
@@ -41,7 +42,7 @@ property will never be accepted for a compatibility or convenience win.
   exist that no manifest record references. Add a `verify --prune` /
   compaction routine that walks `d/` and deletes unreferenced blobs.
 - **Dependency slimming: drop `walkdir`** — its single production use is
-  the directory traversal in `add_directory_tree` (`src/vault/mod.rs`).
+  the directory traversal in `add_directory_tree` (`crates/krypton-core/src/vault/mod.rs`).
   Replace with a ~40-line `std::fs::read_dir` walker preserving exact
   semantics (pre-order, siblings sorted by file name, parents before
   children, symlinks and special files skipped). Removes `walkdir` and

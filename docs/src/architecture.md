@@ -62,7 +62,7 @@ Properties that follow:
 ## The universal container format
 
 Every object the library produces — `.krf` files, vault blobs, manifests —
-is one envelope. Defined in `src/container.rs`; constants are public where
+is one envelope. Defined in `crates/krypton-core/src/container.rs`; constants are public where
 meaningful (`MAGIC`, `ENVELOPE_VERSION`).
 
 ### Wire layout
@@ -144,7 +144,7 @@ core reason the format can evolve without a format zoo.
 
 ## Chunking, nonces and AAD binding
 
-`src/stream.rs` implements record framing shared by all containers.
+`crates/krypton-core/src/stream.rs` implements record framing shared by all containers.
 
 ### Chunk records
 

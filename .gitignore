@@ -1,3 +1,6 @@
 target/
 result/
 *.krf
+docs/book/
+.direnv/
+.DS_Store
