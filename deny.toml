@@ -1,0 +1,32 @@
+# Supply-chain policy for `cargo deny check`.
+#
+# Run locally with `cargo deny check` (install: `cargo install cargo-deny`).
+# CI runs the same checks on every push and pull request.
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "warn"
+ignore = []
+
+[licenses]
+# The project ships under Apache-2.0; these are the transitive licenses we
+# have reviewed and accepted. Keep this list tight rather than blanket-allowing.
+allow = [
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "MIT",
+    "Unicode-3.0",
+    "Unlicense",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Duplicate versions are common and not urgent; surface them as warnings.
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

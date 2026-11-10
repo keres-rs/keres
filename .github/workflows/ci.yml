@@ -30,6 +30,14 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-targets --locked
+      # `--all-targets` deliberately skips doctests; run them explicitly.
+      - run: cargo test --workspace --doc --locked
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
 
   lint:
     runs-on: ubuntu-latest
