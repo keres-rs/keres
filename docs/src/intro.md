@@ -100,8 +100,9 @@ Rules that keep the ecosystem stable forever:
    new types with new AAD contexts.
 4. Schema-bearing payloads (config v2, manifest v2) carry their own inner
    version integers, checked after authentication.
-5. Pre-0.4 formats are retired, not emulated: readers were deleted in
-   0.4. Migration = extract with 0.3 once, re-add with 0.4+.
+5. Only the current format is accepted. Any other magic returns
+   `IncompatibleFormat`; extract old data with the release that wrote it,
+   then re-add it.
 
 ---
 

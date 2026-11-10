@@ -141,7 +141,7 @@ impl KeyDerivation {
 
     fn parse_header(head: &[u8]) -> Result<Self> {
         if head.len() < MAGIC.len() + 3 || &head[..MAGIC.len()] != MAGIC {
-            return Err(retired_or_invalid(head));
+            return Err(Error::IncompatibleFormat);
         }
         let version = u16::from_le_bytes([head[8], head[9]]);
         if version != ENVELOPE_VERSION {
@@ -201,17 +201,6 @@ impl KeyDerivation {
                 Ok(crypto::derive_subkey(&kek, object_salt, &info))
             }
         }
-    }
-}
-
-/// Recognizes retired magics so old files produce a helpful error instead of
-/// a generic one. No parsing of retired formats remains.
-fn retired_or_invalid(head: &[u8]) -> Error {
-    const RETIRED: [&[u8]; 3] = [b"KRYPTON\0", b"KRYPTON2\n", b"KRYPTON3\n"];
-    if RETIRED.iter().any(|m| head.starts_with(m)) {
-        Error::RetiredFormat
-    } else {
-        Error::InvalidHeader
     }
 }
 
@@ -301,7 +290,7 @@ pub(crate) fn read_container<R: Read>(
         .read_exact(&mut first)
         .map_err(|_| Error::InvalidHeader)?;
     if &first[..MAGIC.len()] != MAGIC {
-        return Err(retired_or_invalid(&first));
+        return Err(Error::IncompatibleFormat);
     }
     let extra = match first[10] {
         KIND_HKDF => SALT_LEN,
@@ -508,8 +497,14 @@ mod tests {
     }
 
     #[test]
-    fn retired_magics_reported() {
-        for magic in [b"KRYPTON\0".as_slice(), b"KRYPTON2\n", b"KRYPTON3\n"] {
+    fn non_keres_magics_rejected() {
+        for magic in [
+            b"KRYPTON\0".as_slice(),
+            b"KRYPTON2\n",
+            b"KRYPTON3\n",
+            b"NOTKERES",
+            b"\x89PNG\r\n\x1a\n",
+        ] {
             let mut head = magic.to_vec();
             head.extend_from_slice(b"rest");
             let err = read_container(
@@ -522,8 +517,8 @@ mod tests {
             )
             .unwrap_err();
             assert!(
-                matches!(err, Error::RetiredFormat),
-                "{magic:?} should be reported as retired, got {err:?}"
+                matches!(err, Error::IncompatibleFormat),
+                "{magic:?} should be reported as incompatible, got {err:?}"
             );
         }
     }

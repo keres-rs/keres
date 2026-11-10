@@ -94,11 +94,12 @@ the magic and version are checked directly, while the kind, salts, and KDF
 parameters feed key derivation. Flipping any of those bytes yields a wrong
 key or an early parse error, so the first GCM tag check fails.
 
-Version mismatch fails early with `UnsupportedVersion(v)`; retired magics
-(`KRYPTON\0`, `KRYPTON2\n`, `KRYPTON3\n`) fail with the explicit
-`RetiredFormat` error. Containers from the pre-rename Krypton releases are
-**not** readable by Keres; use a pre-rename release to decrypt them and
-migrate the data.
+Any file whose magic is not exactly `KERES\0\0\0` is rejected with
+`IncompatibleFormat`. That includes pre-rename Krypton containers, pre-0.4
+Krypton formats, and unrelated files. Only the current Keres format is
+accepted; extract old data with the release that wrote it. A header with the
+right magic but a newer envelope version fails early with
+`UnsupportedVersion(v)`.
 
 ### Trailer
 
@@ -345,9 +346,9 @@ One enum (`Error`, thiserror), `Result<T> = std::result::Result<T, Error>`:
 | Variant | Means |
 |---|---|
 | `Authentication` | wrong password/key **or** any tampering — indistinguishable on purpose |
-| `InvalidHeader` | malformed magic/kind/lengths |
+| `InvalidHeader` | malformed kind, lengths, or trailer |
 | `UnsupportedVersion(u32)` | envelope/schema/config version newer than supported |
-| `RetiredFormat` | pre-0.4 file detected (helpful migration hint) |
+| `IncompatibleFormat` | file is not a current Keres container |
 | `InvalidVault` | vault structure problems (bad config, damaged manifest) |
 | `VaultLocked` / `VaultUnlocked` | state-machine misuse |
 | `EntryExists` / `EntryNotFound` | name conflicts |

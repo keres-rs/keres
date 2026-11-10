@@ -21,11 +21,11 @@ pub enum Error {
     #[error("unsupported container version: {0}")]
     UnsupportedVersion(u32),
 
-    /// The file uses a retired pre-0.4 keres format. Re-encrypt or
-    /// extract it with a pre-rename Krypton release; no retired reader
-    /// remains.
-    #[error("file uses a retired keres format")]
-    RetiredFormat,
+    /// The file is not a current Keres container. This covers every other
+    /// format, including pre-rename Krypton releases and pre-0.4 formats.
+    /// Extract the data with the release that wrote it.
+    #[error("incompatible container format")]
+    IncompatibleFormat,
 
     /// AEAD authentication failed — wrong password, corrupted data, or
     /// deliberate tampering.

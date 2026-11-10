@@ -72,6 +72,6 @@ property will never be accepted for a compatibility or convenience win.
 - **Plausibility/deniability (limitation 3)** — the magic is a feature;
   hidden-volume schemes conflict with authenticated formats and invite
   user-error catastrophes. Revisit only with a rigorous design.
-- **Backward compatibility shims** — pre-0.4 formats stay retired.
+- **Backward compatibility shims** — only the current format is accepted.
   Migration is a one-time `keres migrate` helper only if demand exists.
 

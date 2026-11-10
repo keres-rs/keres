@@ -87,8 +87,9 @@ Rules that keep this stable:
    `UnsupportedVersion`.
 2. A released payload type never changes meaning; new object kinds are
    new trailer types with new context strings.
-3. Pre-0.4 formats are retired: readers were removed in 0.4 and old files
-   report `Error::RetiredFormat`. Extract data with 0.3 before upgrading.
+3. Only the current Keres format is accepted. Any other magic returns
+   `Error::IncompatibleFormat`; extract old data with the release that wrote
+   it before upgrading.
 
 ## Verification API
 

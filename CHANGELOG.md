@@ -22,9 +22,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - binary: `keres`
   - environment variables: `KERES_HOME`, `KERES_PASSWORD`
   - default single-file extension: `.krs`
-- New containers write the `KERES\0\0\0` magic. This is a breaking format
-  change: pre-rename Krypton containers are not readable by Keres. Use a
-  pre-rename release to decrypt and migrate them.
+- Only `KERES\0\0\0` containers are accepted. Every other format, including
+  pre-rename Krypton containers and pre-0.4 formats, returns
+  `Error::IncompatibleFormat`. Use the release that wrote the data to
+  extract and migrate it.
 - `keres` now lives at `crates/keres`.
 - `keres-cli` now depends on the local library via a path dependency.
 - Release profile is defined once at the workspace root.
@@ -56,7 +57,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Pre-0.4 formats are retired; old files report `Error::RetiredFormat`.
+- Pre-0.4 formats are retired; old files are rejected.
 
 [Unreleased]: https://github.com/KeresOSS/keres/compare/v0.4.2...HEAD
 [0.4.2]: https://github.com/KeresOSS/keres/compare/v0.4.1...v0.4.2

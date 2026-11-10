@@ -46,4 +46,6 @@ have their own reporting processes.
 ## Supported versions
 
 Keres is pre-1.0. Security fixes are applied to the latest 0.4.x release.
-Pre-0.4 container formats are retired and unsupported.
+Only the current Keres container format is supported. Every other format,
+including pre-rename Krypton containers and pre-0.4 formats, returns
+`Error::IncompatibleFormat`.

@@ -137,7 +137,7 @@ fn garbage_header_rejected() {
     std::fs::write(&fake, b"TOTALLY-NOT\n000000000000000000000000000000000").unwrap();
     assert!(matches!(
         decrypt_file("pw", &fake, &dir.path().join("o")),
-        Err(Error::InvalidHeader)
+        Err(Error::IncompatibleFormat)
     ));
 }
 
