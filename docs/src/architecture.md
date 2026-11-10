@@ -35,7 +35,7 @@ never unbounded allocation or infinite loops.
 Two independent derivations exist, selected per container by a kind byte:
 
 ```
-Standalone .keres (kind = password):
+Standalone .krs (kind = password):
 
   password ──Argon2id(argon_salt, params)──► KEK ──HKDF(object_salt)──► content key
 
@@ -61,7 +61,7 @@ Properties that follow:
 
 ## The universal container format
 
-Every object the library produces — `.keres` files, vault blobs, manifests —
+Every object the library produces — `.krs` files, vault blobs, manifests —
 is one envelope. Defined in `crates/keres/src/container.rs`; constants are public where
 meaningful (`MAGIC`, `ENVELOPE_VERSION`).
 
@@ -95,10 +95,10 @@ parameters feed key derivation. Flipping any of those bytes yields a wrong
 key or an early parse error, so the first GCM tag check fails.
 
 Version mismatch fails early with `UnsupportedVersion(v)`; retired magics
-(`KRYPTON2\n`, `KRYPTON3\n`) fail with the explicit `RetiredFormat` error.
-
-The pre-rename `KRYPTON\0` magic is accepted on read but never written. New
-containers use `KERES\0\0\0`; existing containers keep working.
+(`KRYPTON\0`, `KRYPTON2\n`, `KRYPTON3\n`) fail with the explicit
+`RetiredFormat` error. Containers from the pre-rename Krypton releases are
+**not** readable by Keres; use a pre-rename release to decrypt them and
+migrate the data.
 
 ### Trailer
 
@@ -108,7 +108,7 @@ with the same content key under the reserved nonce `[0xFF; 12]`:
 ```json
 {
   "typ": "file" | "directory" | "manifest",
-  "name": "original-filename.txt",   // .keres only, optional
+  "name": "original-filename.txt",   // .krs only, optional
   "size": 12345,                      // total plaintext length
   "chunk_count": 1                    // number of preceding records
 }
@@ -129,7 +129,7 @@ key derivation (`info = "keres-container-v1/" ‖ identity`) :
 |---|---|---|
 | Vault entry blob | entry path, e.g. `"photos/a.jpg"` | copying one entry's blob over another's slot fails authentication |
 | Manifest | `"vault-manifest"` | fixed constant; manifest location is canonical |
-| Standalone `.keres` | empty | files are self-contained; nothing to bind |
+| Standalone `.krs` | empty | files are self-contained; nothing to bind |
 
 This closes the *blob-transplant* attack class entirely: an attacker who
 swaps two blobs in the vault directory gets `Corrupted` reports from
@@ -200,7 +200,7 @@ Consequences:
 
 ---
 
-## Single-file mode (.keres)
+## Single-file mode (.krs)
 
 `encrypt_file(password, input, output)`:
 
@@ -210,7 +210,7 @@ Consequences:
 3. Writes atomically: temp file (mode 0600) in the destination directory →
    fsync → rename. On Windows: remove-then-rename.
 4. If no output path is given, produces `<sha256(argon_salt ‖ object_salt
-   )>.keres` — a random-looking name leaking nothing about content.
+   )>.krs` — a random-looking name leaking nothing about content.
 
 `decrypt_file(password, input, output)` authenticates the whole container
 while streaming, recovers the original filename from the trailer, sanitizes

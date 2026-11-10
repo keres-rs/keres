@@ -1,6 +1,6 @@
 //! The universal keres container format.
 //!
-//! Every encrypted object the library produces — single-file `.keres`
+//! Every encrypted object the library produces — single-file `.krs`
 //! containers, vault entry blobs and vault manifests — uses this one
 //! envelope. Future object kinds are new trailer payload types, never new
 //! formats.
@@ -8,7 +8,7 @@
 //! # Wire layout
 //!
 //! ```text
-//! b"KERES\0\0\0"     8-byte magic (pre-rename b"KRYPTON\0" is read-only)
+//! b"KERES\0\0\0"     8-byte magic (never changes)
 //! [u16 LE = 1]     envelope format version
 //! [u8 kind]        key-derivation selector:
 //!                    0 = content key is HKDF(master, object_salt[32])
@@ -35,23 +35,11 @@ use crate::error::{Error, Result};
 use crate::kdf::KdfParams;
 use crate::stream;
 
-/// Magic header written by every new Keres container.
+/// Magic header shared by every Keres container.
 ///
 /// The trailing NUL bytes are control bytes: they prevent the magic from
 /// occurring in ordinary text and survive naive character-set mangling.
 pub const MAGIC: &[u8; 8] = b"KERES\0\0\0";
-
-/// Magic written by pre-rename releases.
-///
-/// Accepted on read so existing containers keep working. Never written by
-/// new code.
-pub(crate) const LEGACY_MAGIC: &[u8; 8] = b"KRYPTON\0";
-
-/// Whether `head` starts with the current or the legacy magic.
-fn has_magic(head: &[u8]) -> bool {
-    head.len() >= MAGIC.len()
-        && (&head[..MAGIC.len()] == MAGIC || &head[..MAGIC.len()] == LEGACY_MAGIC)
-}
 
 /// Current envelope version. Written into every container; readers reject
 /// any other value with [`Error::UnsupportedVersion`].
@@ -68,7 +56,7 @@ const KIND_PASSWORD: u8 = 1;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PayloadType {
-    /// Encrypted file contents (standalone `.keres` or vault blob).
+    /// Encrypted file contents (standalone `.krs` or vault blob).
     File,
     /// Directory placeholder (vault only); carries no chunks.
     Directory,
@@ -98,7 +86,7 @@ pub(crate) enum KeyDerivation {
         object_salt: [u8; SALT_LEN],
     },
     /// Content key = HKDF(Argon2id(password, argon2_salt, params),
-    /// object_salt). Used for standalone `.keres` files decryptable from a
+    /// object_salt). Used for standalone `.krs` files decryptable from a
     /// password alone.
     Password {
         /// Argon2id salt.
@@ -152,7 +140,7 @@ impl KeyDerivation {
     }
 
     fn parse_header(head: &[u8]) -> Result<Self> {
-        if head.len() < MAGIC.len() + 3 || !has_magic(head) {
+        if head.len() < MAGIC.len() + 3 || &head[..MAGIC.len()] != MAGIC {
             return Err(retired_or_invalid(head));
         }
         let version = u16::from_le_bytes([head[8], head[9]]);
@@ -216,10 +204,10 @@ impl KeyDerivation {
     }
 }
 
-/// Recognizes retired pre-0.4 magics so old files produce a helpful error
-/// instead of a generic one. No parsing of retired formats remains.
+/// Recognizes retired magics so old files produce a helpful error instead of
+/// a generic one. No parsing of retired formats remains.
 fn retired_or_invalid(head: &[u8]) -> Error {
-    const RETIRED: [&[u8]; 2] = [b"KRYPTON2\n", b"KRYPTON3\n"];
+    const RETIRED: [&[u8]; 3] = [b"KRYPTON\0", b"KRYPTON2\n", b"KRYPTON3\n"];
     if RETIRED.iter().any(|m| head.starts_with(m)) {
         Error::RetiredFormat
     } else {
@@ -232,7 +220,7 @@ fn retired_or_invalid(head: &[u8]) -> Error {
 pub(crate) struct Trailer {
     /// Payload type; also bound into all record AADs.
     pub typ: PayloadType,
-    /// Original filename (single-file `.keres` only).
+    /// Original filename (single-file `.krs` only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// Total plaintext length across all chunks.
@@ -312,7 +300,7 @@ pub(crate) fn read_container<R: Read>(
     inner
         .read_exact(&mut first)
         .map_err(|_| Error::InvalidHeader)?;
-    if !has_magic(&first) {
+    if &first[..MAGIC.len()] != MAGIC {
         return Err(retired_or_invalid(&first));
     }
     let extra = match first[10] {
@@ -520,28 +508,24 @@ mod tests {
     }
 
     #[test]
-    fn legacy_magic_is_readable_but_not_written() {
-        let blob = seal(&pw_kd(), Some("pw"), None, b"legacy", PayloadType::File);
-        assert_eq!(&blob[..MAGIC.len()], MAGIC);
-
-        let mut legacy = blob;
-        legacy[..LEGACY_MAGIC.len()].copy_from_slice(LEGACY_MAGIC);
-        let t = unseal(&legacy, Some("pw"), None, PayloadType::File);
-        assert_eq!(t.size, 6);
-    }
-
-    #[test]
     fn retired_magics_reported() {
-        let err = read_container(
-            Cursor::new(b"KRYPTON3\nrest".to_vec()),
-            None,
-            None,
-            PayloadType::File,
-            b"",
-            |_| Ok(()),
-        )
-        .unwrap_err();
-        assert!(matches!(err, Error::RetiredFormat));
+        for magic in [b"KRYPTON\0".as_slice(), b"KRYPTON2\n", b"KRYPTON3\n"] {
+            let mut head = magic.to_vec();
+            head.extend_from_slice(b"rest");
+            let err = read_container(
+                Cursor::new(head),
+                None,
+                None,
+                PayloadType::File,
+                b"",
+                |_| Ok(()),
+            )
+            .unwrap_err();
+            assert!(
+                matches!(err, Error::RetiredFormat),
+                "{magic:?} should be reported as retired, got {err:?}"
+            );
+        }
     }
 
     #[test]

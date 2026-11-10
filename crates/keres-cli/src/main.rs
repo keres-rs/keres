@@ -139,7 +139,7 @@ enum Commands {
     },
     /// Decrypt a single file.
     Decrypt {
-        /// Path to the encrypted file (.keres).
+        /// Path to the encrypted file (.krs).
         input: PathBuf,
         /// Output decrypted file.
         output: PathBuf,

@@ -42,7 +42,7 @@ vault.lock();
 
 | Module | Contents |
 |---|---|
-| `keres::*` | `encrypt_file` / `decrypt_file` (`.keres` containers), `Vault`, `EntryInfo`, `IntegrityReport` |
+| `keres::*` | `encrypt_file` / `decrypt_file` (`.krs` containers), `Vault`, `EntryInfo`, `IntegrityReport` |
 | `keres::crypto` | Low-level primitives: `Key`, `seal`/`open` (AAD), `derive_key`, HKDF subkeys, constant-time compare |
 | `keres::kdf` | `KdfParams` — Argon2id parameters with validation bounds |
 | `keres::sanitize` | Entry-name validation / traversal defense |
@@ -58,23 +58,23 @@ Run `cargo doc --open` for full documentation with examples on every public item
 - **Deterministic counter nonces** per chunk — eliminates random-nonce birthday collisions on large files and makes reordering detectable
 - **AAD everywhere** — chunk index and record context are bound into each AEAD operation; truncation, splicing and extension are all detected
 - **Streaming** — 64 KiB chunks with constant memory use; files of any size
-- **Metadata privacy** — original filenames never appear unencrypted; `.keres` outputs get random hashed names
+- **Metadata privacy** — original filenames never appear unencrypted; `.krs` outputs get random hashed names
 - **Hardened memory** — keys live in zeroizing buffers, scrubbed on drop; `#![forbid(unsafe_code)]`
 - **Crash safety** — configs, manifests and plaintext outputs are written via temp file + rename; interrupted operations never leave half-written data or bricked vaults
 - **Traversal defense** — names recovered from containers are sanitized before touching the filesystem
-- **One universal container format** — `.keres` files, vault blobs and manifests share a single envelope; new object types are new payload types, never new formats
+- **One universal container format** — `.krs` files, vault blobs and manifests share a single envelope; new object types are new payload types, never new formats
 
 ## File Format
 
 Every object is a *keres container*:
 
 ```
-"KERES\0\0\0"       magic (8 bytes; pre-rename "KRYPTON\0" is read-only)
+"KERES\0\0\0"       magic (8 bytes, never changes)
 [u16 LE]          envelope version (currently 1)
 [u8 kind]         key derivation:
                     0 = HKDF(master key, object salt[32])          — vault objects
                     1 = Argon2id(password, salt[32], params[12])
-                        then HKDF with object salt[32]             — .keres files
+                        then HKDF with object salt[32]             — .krs files
 [len u32][ct‖tag] …   chunk records (64 KiB plaintext each)
 [00000000]        end-of-chunks marker
 [len u32][ct‖tag] authenticated trailer: {type: file|directory|manifest,

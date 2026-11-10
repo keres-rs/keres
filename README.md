@@ -9,7 +9,7 @@ secrets. One Rust workspace: engine, CLI, and documentation.
 
 | Path | What it is |
 |---|---|
-| [`crates/keres`](crates/keres) | The library: `.keres` single-file containers and multi-file encrypted vaults |
+| [`crates/keres`](crates/keres) | The library: `.krs` single-file containers and multi-file encrypted vaults |
 | [`crates/keres-cli`](crates/keres-cli) | The `keres` command-line interface |
 | [`docs`](docs) | The mdBook documentation site |
 
@@ -22,7 +22,7 @@ $ cargo install --path crates/keres-cli
 
 # Single file: the original filename is encrypted inside the container.
 $ keres encrypt document.pdf
-$ keres decrypt <output>.keres restored.pdf
+$ keres decrypt <output>.krs restored.pdf
 
 # Multi-file vault.
 $ keres init personal
@@ -65,10 +65,10 @@ Run `cargo doc -p keres --open` for the full API reference.
 
 ## Design in one paragraph
 
-Every object — a `.keres` file, a vault entry, or the vault index — uses one
-authenticated container format: an 8-byte `KERES\0\0\0` magic (the
-pre-rename `KRYPTON\0` magic is still accepted on read), a versioned header
-whose fields are checked or participate in key derivation, 64 KiB AES-256-GCM chunks
+Every object — a `.krs` file, a vault entry, or the vault index — uses one
+authenticated container format: an 8-byte `KERES\0\0\0` magic, a versioned
+header whose fields are checked or participate in key derivation, 64 KiB
+AES-256-GCM chunks
 with counter nonces and AAD binding, and an authenticated trailer. Passwords
 go through Argon2id to a key-encryption key; vaults wrap a random master key
 once and derive an independent HKDF subkey per object, so changing the

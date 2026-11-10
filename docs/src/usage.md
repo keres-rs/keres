@@ -4,7 +4,7 @@ Keres has two encryption modes over one shared engine:
 
 | Mode | Entry points | Use case |
 |---|---|---|
-| **Single-file** | `encrypt_file`, `decrypt_file`, `keres encrypt/decrypt` | One self-contained `.keres` container |
+| **Single-file** | `encrypt_file`, `decrypt_file`, `keres encrypt/decrypt` | One self-contained `.krs` container |
 | **Vault** | `Vault`, `keres init/add/list/...` | Many files and directories under one password |
 
 Both modes share the same container format, chunk engine, and cryptographic

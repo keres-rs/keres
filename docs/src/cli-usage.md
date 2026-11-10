@@ -5,14 +5,14 @@ Run `keres help` or `keres <command> --help` for the built-in reference.
 ## Single files
 
 ```console
-# Encrypt to a random-looking `.keres` name.
+# Encrypt to a random-looking `.krs` name.
 $ keres encrypt document.pdf
 
 # Encrypt to an explicit path.
-$ keres encrypt document.pdf backup.keres
+$ keres encrypt document.pdf backup.krs
 
 # Decrypt; the original filename is recovered from the container.
-$ keres decrypt backup.keres restored.pdf
+$ keres decrypt backup.krs restored.pdf
 ```
 
 ## Vaults

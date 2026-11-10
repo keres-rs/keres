@@ -6,7 +6,7 @@
 use keres::{decrypt_file, encrypt_file};
 use std::path::Path;
 
-// Encrypt. `None` writes a random-looking `.keres` name in the current dir.
+// Encrypt. `None` writes a random-looking `.krs` name in the current dir.
 let out = encrypt_file("correct horse", Path::new("document.pdf"), None)?;
 
 // Decrypt. Returns the original filename recovered from the authenticated
@@ -80,7 +80,7 @@ variant, so callers cannot turn error messages into a tamper oracle.
 use keres::{decrypt_file, Error};
 use std::path::Path;
 
-match decrypt_file("pw", Path::new("backup.keres"), Path::new("out.bin")) {
+match decrypt_file("pw", Path::new("backup.krs"), Path::new("out.bin")) {
     Ok(original_name) => println!("restored {original_name}"),
     Err(Error::Authentication) => eprintln!("wrong password or corrupted data"),
     Err(e) => eprintln!("failed: {e}"),

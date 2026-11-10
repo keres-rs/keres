@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Consolidated `keres`, `keres-cli`, and the documentation into one
-  Cargo workspace.
+- Consolidated the library, CLI, and documentation into one Cargo workspace.
+- Renamed the project from Krypton to Keres: library `keres`, CLI package
+  `keres-cli`, binary `keres`, and `.krs` single-file containers.
 - Added workspace-wide CI for tests, linting, rustdoc, package dry-runs, and
   the mdBook build.
 - Added root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and
@@ -11,8 +12,8 @@
 
 ## 0.4.2
 
-- Renamed the crates.io package to `keres` while keeping the library
-  name `keres`.
+- Renamed the crates.io package to `krypton-core` while keeping the library
+  name `krypton`.
 - Updated repository metadata.
 
 ## 0.4.1
@@ -21,7 +22,7 @@
 
 ## 0.4.0
 
-- Introduced the universal container format shared by `.keres` files, vault
+- Introduced the universal container format shared by `.krf` files, vault
   blobs, and manifests.
 - Added Argon2id parameters stored in each container.
 - Added per-object HKDF subkeys, counter nonces, and AAD binding.

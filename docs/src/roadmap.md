@@ -57,7 +57,7 @@ property will never be accepted for a compatibility or convenience win.
   (limitation 4). Must remain strictly optional; plain password vaults are
   the default and always supported.
 - **Size hiding (limitation 5)** — optional fixed-size padding buckets
-  for `.keres` output and/or random trailing padding before the end marker,
+  for `.krs` output and/or random trailing padding before the end marker,
   trading space for length privacy. Needs care: padding must be covered by
   the trailer's authenticated `size`.
 - **External security audit** — pay for a professional review of the

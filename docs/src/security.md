@@ -35,7 +35,7 @@ additionally binds a `/trailer` suffix. Consequences:
 
 - Reordering chunks between positions → authentication failure.
 - Truncating the file → detected by trailer cross-check of `size`/`chunk_count`.
-- Moving bytes between two `.keres` files (same password!) → fails because each
+- Moving bytes between two `.krs` files (same password!) → fails because each
   container derives an independent object salt/subkey.
 - The unauthenticated end-of-chunks marker cannot be exploited: the trailer is
   authenticated and its `chunk_count` must match exactly what preceded it.
@@ -63,7 +63,7 @@ have previously exfiltrated.
 
 - Atomic writes: temp file in the same directory + `fsync` + `rename`, so a
   crash mid-write can never corrupt a vault config or manifest.
-- Vault directories and `.keres` outputs are created with mode `0700`/`0600`
+- Vault directories and `.krs` outputs are created with mode `0700`/`0600`
   on Unix.
 - Names read back from containers are sanitized before path joins;
   absolute paths, `..`, separators and control characters are rejected —
@@ -82,9 +82,8 @@ an authenticated trailer carrying the payload type (`file`, `directory`,
 
 Rules that keep this stable:
 
-1. New containers write the `KERES\0\0\0` magic. The pre-rename
-   `KRYPTON\0` magic is accepted on read for compatibility. Envelope
-   revisions bump the version field; readers reject unknown versions with
+1. Every container writes the `KERES\0\0\0` magic. Envelope revisions bump
+   the version field; readers reject unknown versions with
    `UnsupportedVersion`.
 2. A released payload type never changes meaning; new object kinds are
    new trailer types with new context strings.

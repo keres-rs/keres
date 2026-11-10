@@ -11,7 +11,7 @@ storage modes over one shared cryptographic core:
 
 | Mode | Entry points | Use case |
 |---|---|---|
-| **Single-file** | `encrypt_file`, `decrypt_file` | Encrypt an individual file into a self-contained `.keres` container |
+| **Single-file** | `encrypt_file`, `decrypt_file` | Encrypt an individual file into a self-contained `.krs` container |
 | **Vault** | `Vault` struct | A directory holding many entries (files *and* directories) under one password, with an encrypted index |
 
 Both modes share:

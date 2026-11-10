@@ -21,9 +21,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - CLI package: `keres-cli`
   - binary: `keres`
   - environment variables: `KERES_HOME`, `KERES_PASSWORD`
-  - default single-file extension: `.keres`
-- New containers write the `KERES\0\0\0` magic. Pre-rename `KRYPTON\0`
-  containers remain readable.
+  - default single-file extension: `.krs`
+- New containers write the `KERES\0\0\0` magic. This is a breaking format
+  change: pre-rename Krypton containers are not readable by Keres. Use a
+  pre-rename release to decrypt and migrate them.
 - `keres` now lives at `crates/keres`.
 - `keres-cli` now depends on the local library via a path dependency.
 - Release profile is defined once at the workspace root.
@@ -46,7 +47,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Universal container format shared by `.keres` files, vault blobs, and
+- Universal container format shared by `.krf` files, vault blobs, and
   manifests.
 - Argon2id password derivation with per-container KDF parameters.
 - Per-object HKDF subkeys, counter nonces, and AAD binding for every record.

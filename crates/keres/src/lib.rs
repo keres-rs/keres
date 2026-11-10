@@ -16,7 +16,7 @@
 //! * **Streaming** — 64 KiB chunks with constant memory use for files of any
 //!   size.
 //! * **Metadata privacy** — original filenames never appear unencrypted,
-//!   neither in `.keres` containers nor inside vaults.
+//!   neither in `.krs` containers nor inside vaults.
 //! * **Crash safety** — vault configs, manifests and outputs are written via
 //!   temp file + rename; interrupted operations never leave half-written
 //!   plaintext or bricked containers.
@@ -67,7 +67,7 @@
 //! use keres::{decrypt_file, Error};
 //! use std::path::Path;
 //!
-//! match decrypt_file("pw", Path::new("backup.keres"), Path::new("out.bin")) {
+//! match decrypt_file("pw", Path::new("backup.krs"), Path::new("out.bin")) {
 //!     Ok(original_name) => println!("restored {original_name}"),
 //!     Err(Error::Authentication) => eprintln!("wrong password or corrupted data"),
 //!     Err(e) => eprintln!("failed: {e}"),
@@ -99,7 +99,7 @@ mod fsutil;
 pub mod kdf;
 /// Entry-name validation helpers.
 pub mod sanitize;
-/// Single-file `.keres` containers.
+/// Single-file `.krs` containers.
 mod single_file;
 /// Chunked streaming encryption engine.
 mod stream;

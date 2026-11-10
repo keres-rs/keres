@@ -1,6 +1,6 @@
 target/
 result/
-*.keres
+*.krs
 docs/book/
 .direnv/
 .DS_Store
