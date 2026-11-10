@@ -61,7 +61,7 @@ pub(crate) fn write_entry(
 
     let tmp = crate::fsutil::sibling_temp_path(&target);
     let outcome = (|| -> Result<()> {
-        let mut out_file = File::create(&tmp)?;
+        let mut out_file = crate::fsutil::create_private_file(&tmp)?;
         {
             let mut w = BufWriter::new(&mut out_file);
             let mut src_file;

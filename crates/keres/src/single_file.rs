@@ -68,8 +68,7 @@ pub fn encrypt_file(password: &str, input: &Path, output: Option<&Path>) -> Resu
 
     let tmp_path = crate::fsutil::sibling_temp_path(&output_path);
     let result = (|| -> Result<()> {
-        let mut out_file = File::create(&tmp_path)?;
-        crate::fsutil::restrict_perms(&tmp_path);
+        let mut out_file = crate::fsutil::create_private_file(&tmp_path)?;
 
         let mut src = File::open(&input_path)?;
         {
@@ -119,8 +118,7 @@ pub fn decrypt_file(password: &str, input: &Path, output: &Path) -> Result<Strin
 
     let tmp_path = crate::fsutil::sibling_temp_path(output);
     let outcome = (|| -> Result<String> {
-        let tmp = File::create(&tmp_path)?;
-        crate::fsutil::restrict_perms(&tmp_path);
+        let tmp = crate::fsutil::create_private_file(&tmp_path)?;
         let mut sink = BufWriter::new(tmp);
 
         let trailer = container::read_container(

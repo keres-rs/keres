@@ -63,6 +63,9 @@ have previously exfiltrated.
 
 - Atomic writes: temp file in the same directory + `fsync` + `rename`, so a
   crash mid-write can never corrupt a vault config or manifest.
+- Temp files are opened with `O_CREAT | O_EXCL`, so a path that already
+  exists — including a planted symlink — makes the operation fail rather
+  than being written through. On Unix they are mode `0600` from creation.
 - Vault directories and `.krs` outputs are created with mode `0700`/`0600`
   on Unix.
 - Names read back from containers are sanitized before path joins;

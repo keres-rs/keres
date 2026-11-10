@@ -575,8 +575,7 @@ fn stream_blob_to_file(
 
     let outcome = (|| -> Result<()> {
         {
-            let f = fs::File::create(&tmp)?;
-            crate::fsutil::restrict_perms(&tmp);
+            let f = crate::fsutil::create_private_file(&tmp)?;
             let mut w = std::io::BufWriter::new(f);
             blobs::read_entry(vault_dir, master, entry_path, is_directory, |chunk| {
                 w.write_all(chunk)?;

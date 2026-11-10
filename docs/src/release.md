@@ -1,6 +1,6 @@
 # Release Notes
 
-## Unreleased
+## 0.5.0
 
 - Consolidated the library, CLI, and documentation into one Cargo workspace.
 - Renamed the project from Krypton to Keres: library `keres`, CLI package
@@ -11,6 +11,9 @@
   linting, rustdoc, package dry-runs, and the mdBook build.
 - Added root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and
   `CHANGELOG.md`.
+- Hardened temp-file creation: files are created with `O_CREAT | O_EXCL`
+  and mode `0600` (Unix) up front, so plaintext is never briefly readable
+  by other users and a planted symlink cannot redirect a write.
 
 ## 0.4.2
 

@@ -4,7 +4,7 @@ All notable changes to this workspace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-11-10
 
 ### Added
 
@@ -35,6 +35,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `keres-cli` now depends on the local library via a path dependency.
 - Release profile is defined once at the workspace root.
 
+### Security
+
+- Temp files are now created with `O_CREAT | O_EXCL` and, on Unix, mode
+  `0600` at creation time. Previously the file was created with the umask
+  default (typically `0644`) and only then `chmod`ed, and `File::create`
+  would follow a planted symlink. This affects single-file
+  encryption/decryption, vault blob writes, and vault extraction; decrypted
+  plaintext is no longer briefly world-readable, and a pre-created temp path
+  now fails the operation instead of being written through.
+- Directories created by the library now use mode `0700` at creation time
+  rather than being chmod'ed afterwards.
+
 ## [0.4.2] - 2026-08-26
 
 ### Changed
@@ -64,7 +76,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Pre-0.4 formats are retired; old files are rejected.
 
-[Unreleased]: https://github.com/KeresOSS/keres/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/KeresOSS/keres/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/KeresOSS/keres/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/KeresOSS/keres/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/KeresOSS/keres/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/KeresOSS/keres/releases/tag/v0.4.0
