@@ -36,22 +36,43 @@ $ keres remove personal notes.txt
 |---|---|
 | `init <vault>` | Create a new vault |
 | `add <vault> <path> [--name NAME]` | Add a file or directory tree |
-| `remove <vault> <name>` | Remove an entry and, for directories, its subtree |
+| `remove <vault> <name> [--force]` | Remove an entry and, for directories, its subtree |
 | `list <vault>` | List top-level entries |
-| `extract <vault> <name> <dest>` | Restore an entry |
+| `extract <vault> <name> <dest> [--force]` | Restore an entry |
 | `verify <vault>` | Authenticate every entry |
 | `change-password <vault>` | Re-wrap the master key under a new password |
-| `encrypt <input> [output]` | Encrypt one file |
-| `decrypt <input> <output>` | Decrypt one file |
+| `encrypt <input> [output] [--force]` | Encrypt one file |
+| `decrypt <input> <output> [--force]` | Decrypt one file |
+
+## Overwriting and destructive operations
+
+`remove` asks for confirmation on a terminal and refuses to run without
+`--force` when standard input is not a terminal. `extract`, `encrypt`, and
+`decrypt` refuse to overwrite an existing destination unless `--force` is
+given.
 
 ## Passwords in scripts
 
-`keres` prompts on a terminal. For scripts and CI, set
-`KERES_PASSWORD`:
+`keres` prompts on a terminal. For scripts and CI, choose one of:
 
 ```console
+# Read the first line of a file (kept out of the environment).
+$ keres --password-file /run/secrets/keres init personal
+
+# Read from standard input.
+$ printf '%s\n' "$SECRET" | keres --password-stdin list personal
+
+# Environment variable (convenient, but visible to the same user in /proc).
 $ KERES_PASSWORD="$SECRET" keres add personal ./report.pdf
 ```
 
-This is convenient but exposes the password to the process environment.
-Prefer a terminal prompt on shared machines.
+Explicit flags take priority over `KERES_PASSWORD`, which takes priority over
+an interactive prompt. Password values are held in zeroizing buffers and
+scrubbed when the command finishes. Prefer a terminal prompt or a
+permission-restricted password file on shared machines.
+
+`change-password` reads one password per prompt, so with
+`--password-stdin` it expects the current password, the new password, and the
+confirmation on three consecutive lines. With `--password-file` or
+`KERES_PASSWORD` every prompt gets the same value, which is rejected because
+the new password must differ from the current one.
