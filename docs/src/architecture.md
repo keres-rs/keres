@@ -209,7 +209,8 @@ Consequences:
 2. Builds a kind-1 container streaming the file (identity = empty),
    storing the original filename in the trailer.
 3. Writes atomically: temp file (mode 0600) in the destination directory →
-   fsync → rename. On Windows: remove-then-rename.
+   fsync → rename. On Windows, `rename` replaces the destination via
+   `MoveFileEx` with `MOVEFILE_REPLACE_EXISTING`, with no pre-delete window.
 4. If no output path is given, produces `<sha256(argon_salt ‖ object_salt
    )>.krs` — a random-looking name leaking nothing about content.
 
@@ -229,10 +230,17 @@ A vault is a directory:
 ```
 myvault/
 ├── vault.config          bootstrap JSON (plaintext structure, sealed value)
+├── vault.lock            advisory inter-process lock (empty)
 └── d/
     ├── .manifest.enc     the index, as a kind-0 container
     └── <h2>/<h48>.enc    one blob per entry, as kind-0 containers
 ```
+
+Every mutating operation takes an exclusive advisory lock on `vault.lock`;
+read operations (`list`, `extract`, `verify`) take a shared lock. Locks are
+non-blocking: a second process gets `Error::VaultBusy` instead of waiting and
+risking a stale manifest. The lock is released when the operation returns.
+`flock(2)` is used on Unix and `LockFileEx` on Windows via `fs4`.
 
 ### vault.config (bootstrap)
 
@@ -351,6 +359,7 @@ One enum (`Error`, thiserror), `Result<T> = std::result::Result<T, Error>`:
 | `IncompatibleFormat` | file is not a current Keres container |
 | `InvalidVault` | vault structure problems (bad config, damaged manifest) |
 | `VaultLocked` / `VaultUnlocked` | state-machine misuse |
+| `VaultBusy` | another process holds the vault lock |
 | `EntryExists` / `EntryNotFound` | name conflicts |
 | `InvalidName(String)` | validation failure (preview truncated to 32 chars) |
 | `Io(std::io::Error)` | filesystem layer |

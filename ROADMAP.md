@@ -7,9 +7,9 @@ matters most for the monorepo.
 ## Now
 
 - [x] Consolidate the core, CLI, and documentation into one workspace.
-- [ ] Vault-level file locking (`flock`) so concurrent processes cannot
+- [x] Vault-level file locking (`flock`) so concurrent processes cannot
       clobber the manifest.
-- [ ] Cross-platform CI (Windows and macOS) and an atomic replace path for
+- [x] Cross-platform CI (Windows and macOS) and an atomic replace path for
       Windows.
 - [ ] Fuzzing for container, manifest, and config parsers.
 - [ ] `cargo-audit` / `cargo-deny` supply-chain checks and signed releases.

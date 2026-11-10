@@ -85,9 +85,9 @@ $ cargo doc --workspace --no-deps
 $ mdbook serve docs
 ```
 
-The CI matrix runs the workspace tests on stable and the MSRV (1.75),
-checks formatting, clippy, rustdoc, and package dry-runs, and builds the
-documentation book.
+The CI matrix runs the workspace tests on Linux, Windows, and macOS, plus
+the MSRV (1.75) on Linux. It also checks formatting, clippy, rustdoc, and
+package dry-runs, and builds the documentation book.
 
 ## Status
 

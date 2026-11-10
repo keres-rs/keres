@@ -89,12 +89,13 @@ every record's AAD, so records cannot be transplanted between containers.
 ```
 vault/
 ├── vault.config        JSON v2: wrapped master key + KDF params (atomic writes)
+├── vault.lock          advisory inter-process lock (empty)
 └── d/
     ├── .manifest.enc   encrypted index incl. directory child lists
     └── <hash>/<hash>.enc  per-entry blobs
 ```
 
-Entry paths are derived from `SHA256(master_key ‖ path)`; blob contents use per-entry subkeys. Directory removal deletes the entire subtree — blobs and manifest records alike.
+Entry paths are derived from `SHA256(master_key ‖ path)`; blob contents use per-entry subkeys. Directory removal deletes the entire subtree — blobs and manifest records alike. Writers take an exclusive advisory lock and readers a shared one; contended access returns `Error::VaultBusy`.
 
 ## Key Hierarchy
 

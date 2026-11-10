@@ -50,11 +50,9 @@ pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
         f.write_all(bytes)?;
         f.sync_all()?;
         drop(f);
-        // On Windows, renaming onto an existing file fails; remove first.
-        #[cfg(windows)]
-        if path.exists() {
-            fs::remove_file(path)?;
-        }
+        // `rename` replaces an existing destination on Unix and Windows
+        // (Windows uses MoveFileEx with MOVEFILE_REPLACE_EXISTING), so the
+        // old file is never deleted ahead of the new one.
         fs::rename(&tmp, path)?;
         Ok(())
     })();

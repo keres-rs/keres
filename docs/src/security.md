@@ -70,6 +70,10 @@ have previously exfiltrated.
   a malicious vault archive cannot write outside its directory.
 - Directory removal walks the encrypted manifest's child lists, so removing
   a tree leaves no orphaned blobs.
+- Vault access is serialized with an advisory lock on `vault.lock`: writers
+  take it exclusively, readers share it, and a contended operation returns
+  `Error::VaultBusy`. The lock is not a security boundary against a process
+  that deliberately ignores it.
 
 ## Format Versioning Policy
 

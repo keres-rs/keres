@@ -89,10 +89,6 @@ pub fn encrypt_file(password: &str, input: &Path, output: Option<&Path>) -> Resu
         out_file.sync_all()?;
         drop(out_file);
 
-        #[cfg(windows)]
-        if output_path.exists() {
-            std::fs::remove_file(&output_path)?;
-        }
         std::fs::rename(&tmp_path, &output_path)?;
         crate::fsutil::restrict_perms(&output_path);
         crate::fsutil::sync_dir(output_path.parent().unwrap_or_else(|| Path::new(".")));
@@ -140,10 +136,6 @@ pub fn decrypt_file(password: &str, input: &Path, output: &Path) -> Result<Strin
 
         let name = trailer.name.ok_or(Error::MalformedPayload)?;
 
-        #[cfg(windows)]
-        if output.exists() {
-            std::fs::remove_file(output)?;
-        }
         std::fs::rename(&tmp_path, output)?;
         crate::fsutil::sync_dir(output.parent().unwrap_or_else(|| Path::new(".")));
         Ok(name)

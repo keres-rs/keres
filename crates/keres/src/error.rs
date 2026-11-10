@@ -60,6 +60,10 @@ pub enum Error {
     #[error("vault is locked")]
     VaultLocked,
 
+    /// Another process holds the vault's on-disk lock.
+    #[error("vault is busy: another process is using it")]
+    VaultBusy,
+
     /// The vault is already unlocked.
     #[error("vault already unlocked")]
     VaultUnlocked,

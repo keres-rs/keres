@@ -5,8 +5,10 @@
 - Consolidated the library, CLI, and documentation into one Cargo workspace.
 - Renamed the project from Krypton to Keres: library `keres`, CLI package
   `keres-cli`, binary `keres`, and `.krs` single-file containers.
-- Added workspace-wide CI for tests, linting, rustdoc, package dry-runs, and
-  the mdBook build.
+- Added advisory vault locking: writers take an exclusive lock, readers a
+  shared one, and concurrent access returns `Error::VaultBusy`.
+- Added workspace-wide CI for tests on Linux, Windows, and macOS, plus
+  linting, rustdoc, package dry-runs, and the mdBook build.
 - Added root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and
   `CHANGELOG.md`.
 

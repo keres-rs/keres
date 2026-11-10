@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use fs4::FileExt;
 use keres::{Error, Vault};
 use tempfile::TempDir;
 
@@ -29,6 +30,43 @@ fn locked_vault_rejects_operations() {
     std::fs::write(&f, b"x").unwrap();
     assert!(matches!(v.add(&f, None), Err(Error::VaultLocked)));
     assert!(matches!(v.list(), Err(Error::VaultLocked)));
+}
+
+#[test]
+fn concurrent_operations_fail_fast() {
+    let (_d, mut v) = make_vault("busy");
+    let parent = v.path().parent().unwrap().to_path_buf();
+    let src = parent.join("busy.txt");
+    std::fs::write(&src, b"payload").unwrap();
+
+    let lock_path = v.path().join("vault.lock");
+    let held = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .unwrap();
+    FileExt::try_lock(&held).unwrap();
+
+    assert!(matches!(v.add(&src, None), Err(Error::VaultBusy)));
+    assert!(matches!(v.list(), Err(Error::VaultBusy)));
+    assert!(matches!(
+        v.extract("busy.txt", &parent.join("out")),
+        Err(Error::VaultBusy)
+    ));
+    assert!(matches!(
+        v.change_password("master-password", "new-password"),
+        Err(Error::VaultBusy)
+    ));
+    assert!(matches!(v.verify("master-password"), Err(Error::VaultBusy)));
+
+    FileExt::unlock(&held).unwrap();
+    drop(held);
+
+    // Once the lock is free, the same handle works again.
+    v.add(&src, None).unwrap();
+    assert_eq!(v.list().unwrap().len(), 1);
 }
 
 #[test]

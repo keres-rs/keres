@@ -5,6 +5,7 @@
 //! ```text
 //! vault/
 //! |-- vault.config        encrypted master key + KDF parameters (v2 JSON)
+//! |-- vault.lock          advisory inter-process lock (empty)
 //! +-- d/
 //!     |-- .manifest.enc   encrypted index of every entry
 //!     +-- <hash>/<hash>.enc  per-entry ciphertext blobs
@@ -35,10 +36,12 @@ use crate::sanitize;
 
 pub(crate) mod file_ops;
 pub(crate) mod keystore;
+pub(crate) mod lock;
 pub(crate) mod manifest;
 
 use file_ops as blobs;
 use keystore::{KeyStore, VaultConfig};
+use lock::VaultLock;
 use manifest::{EntryMetadata, ManifestMap};
 
 /// A handle to an on-disk encrypted vault.
@@ -167,6 +170,13 @@ impl Vault {
         crate::fsutil::create_private_dir(&self.path)?;
         crate::fsutil::create_private_dir(&self.path.join("d"))?;
 
+        // Re-check under the lock: another process may have initialized the
+        // vault between the check above and this point.
+        let _lock = VaultLock::exclusive(&self.path)?;
+        if self.exists() {
+            return Err(Error::VaultExists);
+        }
+
         let config = self.keystore.init(password)?;
 
         let json = serde_json::to_string_pretty(&config).map_err(|_| Error::InvalidVault)?;
@@ -220,6 +230,7 @@ impl Vault {
     /// ```
     pub fn add(&mut self, source: &Path, name: Option<&str>) -> Result<()> {
         let master = self.require_unlocked()?;
+        let _lock = VaultLock::exclusive(&self.path)?;
 
         let source = source
             .canonicalize()
@@ -267,6 +278,7 @@ impl Vault {
     /// Both the ciphertext blobs and their manifest records are deleted.
     pub fn remove(&mut self, name: &str) -> Result<()> {
         let master = self.require_unlocked()?;
+        let _lock = VaultLock::exclusive(&self.path)?;
         sanitize::validate_new_name(name)?;
 
         let mut all = manifest::load(&self.path, &master)?;
@@ -283,6 +295,7 @@ impl Vault {
     /// their full `parent/child` path in other operations.
     pub fn list(&self) -> Result<Vec<EntryInfo>> {
         let master = self.require_unlocked()?;
+        let _lock = VaultLock::shared(&self.path)?;
         let all = manifest::load(&self.path, &master)?;
         Ok(all
             .iter()
@@ -312,6 +325,7 @@ impl Vault {
     /// ```
     pub fn extract(&self, name: &str, dest: &Path) -> Result<PathBuf> {
         let master = self.require_unlocked()?;
+        let _lock = VaultLock::shared(&self.path)?;
 
         let all = manifest::load(&self.path, &master)?;
         let meta = all
@@ -355,6 +369,10 @@ impl Vault {
     /// # Ok::<(), keres::Error>(())
     /// ```
     pub fn change_password(&mut self, old_password: &str, new_password: &str) -> Result<()> {
+        if !self.exists() {
+            return Err(Error::VaultNotFound);
+        }
+        let _lock = VaultLock::exclusive(&self.path)?;
         let config = self.load_config()?;
         // Prove knowledge of the old password even if the vault was already
         // unlocked.
@@ -386,6 +404,10 @@ impl Vault {
     /// # Ok::<(), keres::Error>(())
     /// ```
     pub fn verify(&mut self, password: &str) -> Result<IntegrityReport> {
+        if !self.exists() {
+            return Err(Error::VaultNotFound);
+        }
+        let _lock = VaultLock::shared(&self.path)?;
         let was_unlocked = self.is_unlocked();
         if !was_unlocked {
             self.unlock(password)?;
@@ -562,10 +584,6 @@ fn stream_blob_to_file(
             })?;
             w.flush()?;
             w.get_ref().sync_all()?;
-        }
-        #[cfg(windows)]
-        if target.exists() {
-            fs::remove_file(target)?;
         }
         fs::rename(&tmp, target)?;
         crate::fsutil::sync_dir(target.parent().unwrap_or_else(|| Path::new(".")));

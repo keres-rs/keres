@@ -12,7 +12,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   documentation book.
 - Root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and `CHANGELOG.md`.
 - Workspace-level CI for tests, linting, rustdoc, package dry-runs, and the
-  mdBook build.
+  mdBook build, now with Windows and macOS test jobs.
+- Advisory vault locking (`vault.lock`): writers take an exclusive lock,
+  readers a shared lock, and concurrent access fails fast with
+  `Error::VaultBusy` instead of racing on the manifest.
 
 ### Changed
 
@@ -26,6 +29,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   pre-rename Krypton containers and pre-0.4 formats, returns
   `Error::IncompatibleFormat`. Use the release that wrote the data to
   extract and migrate it.
+- Atomic replacement now uses `rename` directly on Windows as well, removing
+  the non-atomic delete-then-rename fallback.
 - `keres` now lives at `crates/keres`.
 - `keres-cli` now depends on the local library via a path dependency.
 - Release profile is defined once at the workspace root.

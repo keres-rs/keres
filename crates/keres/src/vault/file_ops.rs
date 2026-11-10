@@ -87,10 +87,6 @@ pub(crate) fn write_entry(
         out_file.sync_all()?;
         drop(out_file);
 
-        #[cfg(windows)]
-        if target.exists() {
-            std::fs::remove_file(&target)?;
-        }
         std::fs::rename(&tmp, &target)?;
         if let Some(parent) = target.parent() {
             crate::fsutil::sync_dir(parent);

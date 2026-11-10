@@ -17,9 +17,12 @@ property will never be accepted for a compatibility or convenience win.
   increasing generation counter in the vault config and sign each manifest
   save with it, so restoring an old snapshot of the vault directory is at
   least *detectable* on next unlock.
-- **CI hardening** — Windows and macOS jobs (rename and permission
-  semantics differ), `cargo-audit` / `cargo-deny` supply-chain checks, and
-  signed release artifacts.
+- **Concurrent-access safety** — non-blocking advisory locks around every
+  vault read and write, so a second process fails fast with `VaultBusy`
+  instead of clobbering the manifest. *(Done.)*
+- **CI hardening** — Windows and macOS test jobs are in place; remaining
+  work is `cargo-audit` / `cargo-deny` supply-chain checks and signed
+  release artifacts.
 
 ## Next (0.5.x)
 
