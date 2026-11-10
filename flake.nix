@@ -1,5 +1,5 @@
 {
-  description = "Krypton: encrypted files, vaults, and CLI";
+  description = "Keres: encrypted files, vaults, and CLI";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -29,28 +29,28 @@
           RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
 
           shellHook = ''
-            echo "krypton dev shell — rustc $(rustc --version)"
+            echo "keres dev shell — rustc $(rustc --version)"
           '';
         };
 
         # Build the workspace (library + CLI): `nix build`
-        packages.krypton = pkgs.rustPlatform.buildRustPackage {
-          pname = "krypton";
+        packages.keres = pkgs.rustPlatform.buildRustPackage {
+          pname = "keres";
           inherit version;
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
           meta = with pkgs.lib; {
             description = "Encrypted files, vaults, and CLI";
-            homepage = "https://github.com/KryptonOSS/krypton-core";
+            homepage = "https://github.com/KeresOSS/keres";
             license = licenses.apache2;
-            mainProgram = "krypton";
+            mainProgram = "keres";
             platforms = platforms.unix;
           };
         };
-        packages.default = self.packages.${system}.krypton;
+        packages.default = self.packages.${system}.keres;
 
-        checks.krypton-tests = pkgs.rustPlatform.buildRustPackage {
-          pname = "krypton-tests";
+        checks.keres-tests = pkgs.rustPlatform.buildRustPackage {
+          pname = "keres-tests";
           version = "dev";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;

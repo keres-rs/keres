@@ -1,12 +1,12 @@
 # Preface
 
-This manual describes how to install, use, and understand Krypton.
+This manual describes how to install, use, and understand Keres.
 
-Krypton is a local-first encryption engine with two surfaces: a Rust library
+Keres is a local-first encryption engine with two surfaces: a Rust library
 and a command-line interface. The same container format backs both single-file
-`.krf` encryption and multi-file vaults.
+`.keres` encryption and multi-file vaults.
 
 If you find a problem, open an issue on
-[GitHub](https://github.com/KryptonOSS/krypton-core/issues). For security
-reports, follow [SECURITY.md](https://github.com/KryptonOSS/krypton-core/blob/main/SECURITY.md)
+[GitHub](https://github.com/KeresOSS/keres/issues). For security
+reports, follow [SECURITY.md](https://github.com/KeresOSS/keres/blob/main/SECURITY.md)
 instead of opening a public issue.

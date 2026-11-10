@@ -3,24 +3,24 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use krypton::prelude::*;
+use keres::prelude::*;
 
-use krypton::Vault;
+use keres::Vault;
 
 fn vault_root() -> Result<PathBuf> {
-    if let Some(dir) = std::env::var_os("KRYPTON_HOME") {
+    if let Some(dir) = std::env::var_os("KERES_HOME") {
         if dir.is_empty() {
-            return Err(Error::Operation("KRYPTON_HOME is set but empty".into()));
+            return Err(Error::Operation("KERES_HOME is set but empty".into()));
         }
         return Ok(PathBuf::from(dir).join("vaults"));
     }
     match std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
-        Some(home) if !home.is_empty() => Ok(PathBuf::from(home).join(".krypton").join("vaults")),
+        Some(home) if !home.is_empty() => Ok(PathBuf::from(home).join(".keres").join("vaults")),
         Some(_) => Err(Error::Operation(
-            "HOME is set but empty; unset it or set KRYPTON_HOME".into(),
+            "HOME is set but empty; unset it or set KERES_HOME".into(),
         )),
         None => Err(Error::Operation(
-            "cannot determine home directory; set HOME or KRYPTON_HOME".into(),
+            "cannot determine home directory; set HOME or KERES_HOME".into(),
         )),
     }
 }
@@ -66,7 +66,7 @@ fn existing_vault_path(name: &str) -> Result<PathBuf> {
     let path = vault_path(name)?;
     if !path.is_dir() {
         return Err(Error::Operation(format!(
-            "no vault named {name:?} at {} (create it with `krypton init {name}`)",
+            "no vault named {name:?} at {} (create it with `keres init {name}`)",
             path.display()
         )));
     }
@@ -74,8 +74,8 @@ fn existing_vault_path(name: &str) -> Result<PathBuf> {
 }
 
 #[derive(Parser)]
-#[command(name = "krypton")]
-#[command(version = krypton::VERSION)]
+#[command(name = "keres")]
+#[command(version = keres::VERSION)]
 #[command(about = "Encrypt your personal files or secrets", long_about = None)]
 struct Cli {
     #[command(subcommand)]
@@ -86,12 +86,12 @@ struct Cli {
 enum Commands {
     /// Initialize a new vault.
     Init {
-        /// Vault name (stored in `~/.krypton/vaults/<name>`).
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
     },
     /// Add a file or folder to the vault.
     Add {
-        /// Vault name (stored in `~/.krypton/vaults/<name>`).
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
         /// Path to the file or folder to add.
         path: PathBuf,
@@ -101,19 +101,19 @@ enum Commands {
     },
     /// Remove a file or folder from the vault.
     Remove {
-        /// Vault name (stored in `~/.krypton/vaults/<name>`).
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
         /// Name of the file/folder in vault.
         name: String,
     },
     /// List vault contents.
     List {
-        /// Vault name (stored in `~/.krypton/vaults/<name>`).
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
     },
     /// Extract/decrypt a file from the vault.
     Extract {
-        /// Vault name (stored in `~/.krypton/vaults/<name>`).
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
         /// Name of the file in vault.
         name: String,
@@ -122,12 +122,12 @@ enum Commands {
     },
     /// Change the vault password.
     ChangePassword {
-        /// Vault name (stored in `~/.krypton/vaults/<name>`).
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
     },
     /// Verify the integrity of all vault entries (full authentication).
     Verify {
-        /// Vault name (stored in `~/.krypton/vaults/<name>`).
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
     },
     /// Encrypt a single file.
@@ -139,7 +139,7 @@ enum Commands {
     },
     /// Decrypt a single file.
     Decrypt {
-        /// Path to the encrypted file (.krf).
+        /// Path to the encrypted file (.keres).
         input: PathBuf,
         /// Output decrypted file.
         output: PathBuf,
@@ -147,7 +147,7 @@ enum Commands {
 }
 
 fn prompt_password(prompt: &str) -> Result<String> {
-    if let Ok(pwd) = std::env::var("KRYPTON_PASSWORD") {
+    if let Ok(pwd) = std::env::var("KERES_PASSWORD") {
         return Ok(pwd);
     }
     print!("{prompt}: ");
@@ -291,12 +291,12 @@ fn run(command: Commands) -> Result<()> {
         }
         Commands::Encrypt { input, output } => {
             let password = prompt_password("Enter encryption password")?;
-            let out_path = krypton::encrypt_file(&password, &input, output.as_deref())?;
+            let out_path = keres::encrypt_file(&password, &input, output.as_deref())?;
             println!("Encrypted to: {}", out_path.display());
         }
         Commands::Decrypt { input, output } => {
             let password = prompt_password("Enter decryption password")?;
-            let original_name = krypton::decrypt_file(&password, &input, &output)?;
+            let original_name = keres::decrypt_file(&password, &input, &output)?;
             println!("Decrypted '{original_name}' to: {}", output.display());
         }
     }

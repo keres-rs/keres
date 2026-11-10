@@ -1,6 +1,6 @@
 use core::fmt;
 
-/// Errors returned by krypton operations.
+/// Errors returned by keres operations.
 ///
 /// Variants are deliberately coarse-grained: cryptographic failures never
 /// reveal whether the password was wrong or the data was tampered with, and
@@ -21,9 +21,9 @@ pub enum Error {
     #[error("unsupported container version: {0}")]
     UnsupportedVersion(u32),
 
-    /// The file uses a retired pre-0.4 krypton format. Re-encrypt or
-    /// extract it with krypton 0.3 before use; no retired reader remains.
-    #[error("file uses a retired krypton format")]
+    /// The file uses a retired pre-0.4 keres format. Re-encrypt or
+    /// extract it with keres 0.3 before use; no retired reader remains.
+    #[error("file uses a retired keres format")]
     RetiredFormat,
 
     /// AEAD authentication failed — wrong password, corrupted data, or

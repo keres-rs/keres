@@ -1,33 +1,33 @@
-# Krypton CLI usage
+# Keres CLI usage
 
-Run `krypton help` or `krypton <command> --help` for the built-in reference.
+Run `keres help` or `keres <command> --help` for the built-in reference.
 
 ## Single files
 
 ```console
-# Encrypt to a random-looking `.krf` name.
-$ krypton encrypt document.pdf
+# Encrypt to a random-looking `.keres` name.
+$ keres encrypt document.pdf
 
 # Encrypt to an explicit path.
-$ krypton encrypt document.pdf backup.krf
+$ keres encrypt document.pdf backup.keres
 
 # Decrypt; the original filename is recovered from the container.
-$ krypton decrypt backup.krf restored.pdf
+$ keres decrypt backup.keres restored.pdf
 ```
 
 ## Vaults
 
-Vaults are named and stored under `~/.krypton/vaults/<name>` by default.
+Vaults are named and stored under `~/.keres/vaults/<name>` by default.
 
 ```console
-$ krypton init personal
-$ krypton add personal ./notes.txt
-$ krypton add personal ./photos --name photos
-$ krypton list personal
-$ krypton extract personal photos ./restored
-$ krypton verify personal
-$ krypton change-password personal
-$ krypton remove personal notes.txt
+$ keres init personal
+$ keres add personal ./notes.txt
+$ keres add personal ./photos --name photos
+$ keres list personal
+$ keres extract personal photos ./restored
+$ keres verify personal
+$ keres change-password personal
+$ keres remove personal notes.txt
 ```
 
 ### Commands
@@ -46,11 +46,11 @@ $ krypton remove personal notes.txt
 
 ## Passwords in scripts
 
-`krypton` prompts on a terminal. For scripts and CI, set
-`KRYPTON_PASSWORD`:
+`keres` prompts on a terminal. For scripts and CI, set
+`KERES_PASSWORD`:
 
 ```console
-$ KRYPTON_PASSWORD="$SECRET" krypton add personal ./report.pdf
+$ KERES_PASSWORD="$SECRET" keres add personal ./report.pdf
 ```
 
 This is convenient but exposes the password to the process environment.

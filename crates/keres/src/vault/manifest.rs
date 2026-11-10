@@ -3,7 +3,7 @@
 //! The manifest maps each entry's full vault-relative path to its metadata,
 //! including the child lists that make recursive removal possible.
 //!
-//! Stored at `d/.manifest.enc` as a universal krypton container (see
+//! Stored at `d/.manifest.enc` as a universal keres container (see
 //! [`crate::container`]) with HKDF-from-master key derivation and payload
 //! type `manifest`; the index JSON is carried in the chunk section, so
 //! manifests grow past any artificial size limit.

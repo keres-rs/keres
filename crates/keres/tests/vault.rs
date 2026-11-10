@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use krypton::{Error, Vault};
+use keres::{Error, Vault};
 use tempfile::TempDir;
 
 fn make_vault(tag: &str) -> (TempDir, Vault) {

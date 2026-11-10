@@ -1,23 +1,23 @@
-# Krypton Core
+# Keres library
 
-`krypton-core` is the library crate. The package is named `krypton-core` on
-crates.io, but the library target is `krypton`, so imports look like this:
+`keres` is the library crate. The package is named `keres` on
+crates.io, but the library target is `keres`, so imports look like this:
 
 ```rust
-use krypton::{decrypt_file, encrypt_file, Vault};
+use keres::{decrypt_file, encrypt_file, Vault};
 ```
 
 ## Add the dependency
 
 ```console
-$ cargo add krypton-core
+$ cargo add keres
 ```
 
 or, in `Cargo.toml`:
 
 ```toml
 [dependencies]
-krypton-core = "0.4"
+keres = "0.4"
 ```
 
 ## Requirements
@@ -28,9 +28,9 @@ krypton-core = "0.4"
 ## From the workspace
 
 ```console
-$ cargo build -p krypton-core
-$ cargo doc -p krypton-core --open
-$ cargo test -p krypton-core
+$ cargo build -p keres
+$ cargo doc -p keres --open
+$ cargo test -p keres
 ```
 
 Next: [use the library](core-usage.md).

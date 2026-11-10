@@ -3,8 +3,8 @@
 The core, CLI, and documentation live in one repository:
 
 ```console
-$ git clone https://github.com/KryptonOSS/krypton-core.git
-$ cd krypton-core
+$ git clone https://github.com/KeresOSS/keres.git
+$ cd keres
 ```
 
 ## Build and test the workspace
@@ -16,8 +16,8 @@ $ cargo fmt --all -- --check
 $ cargo doc --workspace --no-deps
 ```
 
-The CLI binary is written to `target/debug/krypton` (or
-`target/release/krypton` with `--release`).
+The CLI binary is written to `target/debug/keres` (or
+`target/release/keres` with `--release`).
 
 ## Build the documentation
 

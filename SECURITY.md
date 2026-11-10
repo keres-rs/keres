@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities privately to the maintainers through
-GitHub's [private vulnerability reporting](https://github.com/KryptonOSS/krypton-core/security/advisories/new)
+GitHub's [private vulnerability reporting](https://github.com/KeresOSS/keres/security/advisories/new)
 or by opening a draft security advisory. Do not open a public issue for a
 vulnerability. Include:
 
@@ -14,9 +14,9 @@ vulnerability. Include:
 We aim to acknowledge reports within 72 hours and will coordinate disclosure.
 Please give us a reasonable window to ship a fix before publishing details.
 
-## What Krypton protects against
+## What Keres protects against
 
-Krypton protects data at rest against an attacker with read access to the
+Keres protects data at rest against an attacker with read access to the
 storage medium (stolen disk, leaked backup, synced cloud folder) and against
 an attacker with write access who modifies, truncates, reorders, or
 transplants ciphertext. Authenticated encryption covers every chunk and the
@@ -39,11 +39,11 @@ The full threat model and design rationale are in
 
 ## Scope
 
-The security surface is the code in `crates/krypton-core` and
-`crates/krypton-cli`. The GUI and Python bindings are separate projects and
+The security surface is the code in `crates/keres` and
+`crates/keres-cli`. The GUI and Python bindings are separate projects and
 have their own reporting processes.
 
 ## Supported versions
 
-Krypton is pre-1.0. Security fixes are applied to the latest 0.4.x release.
+Keres is pre-1.0. Security fixes are applied to the latest 0.4.x release.
 Pre-0.4 container formats are retired and unsupported.

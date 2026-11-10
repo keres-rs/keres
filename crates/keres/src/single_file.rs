@@ -1,6 +1,6 @@
-//! Single-file encryption (the `.krf` container).
+//! Single-file encryption (the `.keres` container).
 //!
-//! A `.krf` file is a universal krypton container (see [`crate::container`])
+//! A `.keres` file is a universal keres container (see [`crate::container`])
 //! with password-based key derivation (`kind = 1`) and payload type
 //! `file`. The original filename travels inside the authenticated trailer.
 //!
@@ -15,12 +15,12 @@ use crate::container::{self, KeyDerivation, PayloadType};
 
 use crate::error::{Error, Result};
 
-/// Encrypts `input` into a `.krf` container.
+/// Encrypts `input` into a `.keres` container.
 ///
 /// * `password` - the encryption password.
 /// * `input` - file to encrypt.
 /// * `output` - destination path; when `None` a random-looking hashed name
-///   ending in `.krf` is generated (the original filename never appears on
+///   ending in `.keres` is generated (the original filename never appears on
 ///   disk unencrypted).
 ///
 /// Returns the path of the written container. Output is produced atomically
@@ -28,7 +28,7 @@ use crate::error::{Error, Result};
 ///
 /// ```no_run
 /// use std::path::Path;
-/// let out = krypton::encrypt_file("correct horse", Path::new("document.pdf"), None).unwrap();
+/// let out = keres::encrypt_file("correct horse", Path::new("document.pdf"), None).unwrap();
 /// ```
 pub fn encrypt_file(password: &str, input: &Path, output: Option<&Path>) -> Result<PathBuf> {
     let input_path = input
@@ -62,7 +62,7 @@ pub fn encrypt_file(password: &str, input: &Path, output: Option<&Path>) -> Resu
             let mut hasher = Sha256::new();
             hasher.update(argon_salt);
             hasher.update(object_salt);
-            PathBuf::from(format!("{:x}.krf", hasher.finalize()))
+            PathBuf::from(format!("{:x}.keres", hasher.finalize()))
         }
     };
 
@@ -108,7 +108,7 @@ pub fn encrypt_file(password: &str, input: &Path, output: Option<&Path>) -> Resu
     }
 }
 
-/// Decrypts a `.krf` container into `output`.
+/// Decrypts a `.keres` container into `output`.
 ///
 /// Returns the original filename recovered from the authenticated trailer.
 ///

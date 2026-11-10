@@ -1,5 +1,5 @@
 [package]
-name = "krypton-core"
+name = "keres"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,14 +7,14 @@ authors.workspace = true
 description = "A memory-safe, high-performance Rust library for modern file encryption and secure vaults."
 license.workspace = true
 repository.workspace = true
-homepage = "https://kryptonoss.github.io"
-documentation = "https://docs.rs/krypton-core"
+homepage = "https://keresoss.github.io"
+documentation = "https://docs.rs/keres"
 keywords = ["encryption", "aes", "cryptography", "vault", "argon2"]
 categories = ["cryptography", "filesystem"]
 readme = "README.md"
 
 [lib]
-name = "krypton"
+name = "keres"
 
 [dependencies]
 aes-gcm = "0.10"

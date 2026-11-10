@@ -1,20 +1,20 @@
 # Contributing
 
-Contributions to Krypton are welcome. The repository is a single Cargo
+Contributions to Keres are welcome. The repository is a single Cargo
 workspace containing the library, CLI, and documentation.
 
 ## Getting started
 
 ```console
-$ git clone https://github.com/KryptonOSS/krypton-core.git
-$ cd krypton-core
+$ git clone https://github.com/KeresOSS/keres.git
+$ cd keres
 $ cargo test --workspace --all-targets
 ```
 
 The workspace layout:
 
-- `crates/krypton-core/` — library: container format, crypto, vault.
-- `crates/krypton-cli/` — the `krypton` binary.
+- `crates/keres/` — library: container format, crypto, vault.
+- `crates/keres-cli/` — the `keres` binary.
 - `docs/` — this mdBook.
 
 ## Before opening a pull request
@@ -39,7 +39,7 @@ $ mdbook build docs
 - New behavior needs a test that fails without the change.
 - The container format is versioned. New object kinds are new payload types,
   never new magics.
-- Keep the CLI a thin wrapper; business logic belongs in `krypton-core`.
+- Keep the CLI a thin wrapper; business logic belongs in `keres`.
 - Prefer small, focused commits.
 
 ## Reporting bugs and vulnerabilities
@@ -47,7 +47,7 @@ $ mdbook build docs
 - Bugs and feature requests: open a GitHub issue with a minimal reproducer,
   OS, Rust version, and the command or API call used.
 - Security issues: do **not** open a public issue. See
-  [SECURITY.md](https://github.com/KryptonOSS/krypton-core/blob/main/SECURITY.md).
+  [SECURITY.md](https://github.com/KeresOSS/keres/blob/main/SECURITY.md).
 
 ## License
 

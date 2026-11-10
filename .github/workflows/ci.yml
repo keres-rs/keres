@@ -51,5 +51,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo publish --dry-run --locked -p krypton-core
-      - run: cargo publish --dry-run --locked -p krypton-cli
+      - run: cargo publish --dry-run --locked -p keres
+      # `keres-cli` depends on the published `keres` crate, so it cannot be
+      # packaged until the first `keres` release is on crates.io.
+      - name: Check CLI package
+        run: |
+          if curl -fsS https://crates.io/api/v1/crates/keres >/dev/null; then
+            cargo publish --dry-run --locked -p keres-cli
+          else
+            echo "keres is not on crates.io yet; skipping keres-cli dry run"
+          fi

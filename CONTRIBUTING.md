@@ -1,4 +1,4 @@
-# Contributing to Krypton
+# Contributing to Keres
 
 Thanks for helping. This repository is a single Cargo workspace containing
 the library, the CLI, and the documentation.
@@ -6,8 +6,8 @@ the library, the CLI, and the documentation.
 ## Getting started
 
 ```console
-$ git clone https://github.com/KryptonOSS/krypton-core.git
-$ cd krypton-core
+$ git clone https://github.com/KeresOSS/keres.git
+$ cd keres
 $ cargo test --workspace --all-targets
 ```
 
@@ -20,10 +20,10 @@ $ nix develop            # if you use Nix; includes mdbook
 
 ## Layout
 
-- `crates/krypton-core/` — the library. Container format, crypto primitives,
+- `crates/keres/` — the library. Container format, crypto primitives,
   vault implementation, and integration tests.
-- `crates/krypton-cli/` — the `krypton` binary. Keep it a thin wrapper over
-  the library; business logic belongs in `krypton-core`.
+- `crates/keres-cli/` — the `keres` binary. Keep it a thin wrapper over
+  the library; business logic belongs in `keres`.
 - `docs/` — the mdBook sources. Build locally with `mdbook serve docs`.
 
 ## Before opening a pull request

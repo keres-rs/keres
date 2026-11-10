@@ -1,23 +1,23 @@
 [package]
-name = "krypton-cli"
+name = "keres-cli"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
-description = "CLI for krypton: encrypted vaults and single-file encryption with metadata protection"
+description = "CLI for keres: encrypted vaults and single-file encryption with metadata protection"
 license.workspace = true
 repository.workspace = true
-homepage = "https://kryptonoss.github.io"
+homepage = "https://keresoss.github.io"
 keywords = ["encryption", "cli", "cryptography", "vault"]
 categories = ["command-line-utilities", "cryptography"]
 readme = "README.md"
 
 [[bin]]
-name = "krypton"
+name = "keres"
 path = "src/main.rs"
 doc = false
 
 [dependencies]
-krypton-core = { path = "../krypton-core", version = "0.4.2" }
+keres = { path = "../keres", version = "0.4.2" }
 clap.workspace = true
 rpassword.workspace = true

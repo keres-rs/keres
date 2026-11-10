@@ -26,7 +26,7 @@ pub(crate) struct VaultConfig {
     pub wrapped_master_key: Vec<u8>,
 }
 
-pub(crate) const VAULT_CONFIG_AAD: &[u8] = b"krypton-vault-config-v2";
+pub(crate) const VAULT_CONFIG_AAD: &[u8] = b"keres-vault-config-v2";
 
 /// Fixed nonce for the config blob.
 ///

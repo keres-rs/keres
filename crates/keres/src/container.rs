@@ -1,6 +1,6 @@
-//! The universal krypton container format.
+//! The universal keres container format.
 //!
-//! Every encrypted object the library produces — single-file `.krf`
+//! Every encrypted object the library produces — single-file `.keres`
 //! containers, vault entry blobs and vault manifests — uses this one
 //! envelope. Future object kinds are new trailer payload types, never new
 //! formats.
@@ -8,7 +8,7 @@
 //! # Wire layout
 //!
 //! ```text
-//! b"KRYPTON\0"     8-byte magic (never changes)
+//! b"KERES\0\0\0"     8-byte magic (pre-rename b"KRYPTON\0" is read-only)
 //! [u16 LE = 1]     envelope format version
 //! [u8 kind]        key-derivation selector:
 //!                    0 = content key is HKDF(master, object_salt[32])
@@ -35,18 +35,30 @@ use crate::error::{Error, Result};
 use crate::kdf::KdfParams;
 use crate::stream;
 
-/// Magic header shared by every krypton container.
+/// Magic header written by every new Keres container.
 ///
-/// The trailing NUL is a control byte: it prevents the magic from occurring
-/// in ordinary text and survives naive character-set mangling.
-pub const MAGIC: &[u8; 8] = b"KRYPTON\0";
+/// The trailing NUL bytes are control bytes: they prevent the magic from
+/// occurring in ordinary text and survive naive character-set mangling.
+pub const MAGIC: &[u8; 8] = b"KERES\0\0\0";
+
+/// Magic written by pre-rename releases.
+///
+/// Accepted on read so existing containers keep working. Never written by
+/// new code.
+pub(crate) const LEGACY_MAGIC: &[u8; 8] = b"KRYPTON\0";
+
+/// Whether `head` starts with the current or the legacy magic.
+fn has_magic(head: &[u8]) -> bool {
+    head.len() >= MAGIC.len()
+        && (&head[..MAGIC.len()] == MAGIC || &head[..MAGIC.len()] == LEGACY_MAGIC)
+}
 
 /// Current envelope version. Written into every container; readers reject
 /// any other value with [`Error::UnsupportedVersion`].
 pub const ENVELOPE_VERSION: u16 = 1;
 
 pub(crate) const SALT_LEN: usize = crate::crypto::SALT_LEN;
-const HKDF_INFO: &[u8] = b"krypton-container-v1";
+const HKDF_INFO: &[u8] = b"keres-container-v1";
 const KIND_HKDF: u8 = 0;
 const KIND_PASSWORD: u8 = 1;
 
@@ -56,7 +68,7 @@ const KIND_PASSWORD: u8 = 1;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PayloadType {
-    /// Encrypted file contents (standalone `.krf` or vault blob).
+    /// Encrypted file contents (standalone `.keres` or vault blob).
     File,
     /// Directory placeholder (vault only); carries no chunks.
     Directory,
@@ -66,7 +78,7 @@ pub enum PayloadType {
 
 impl PayloadType {
     fn context(self) -> Vec<u8> {
-        let mut c = b"krypton-container-v1/".to_vec();
+        let mut c = b"keres-container-v1/".to_vec();
         c.extend_from_slice(match self {
             PayloadType::File => &b"file"[..],
             PayloadType::Directory => &b"directory"[..],
@@ -86,7 +98,7 @@ pub(crate) enum KeyDerivation {
         object_salt: [u8; SALT_LEN],
     },
     /// Content key = HKDF(Argon2id(password, argon2_salt, params),
-    /// object_salt). Used for standalone `.krf` files decryptable from a
+    /// object_salt). Used for standalone `.keres` files decryptable from a
     /// password alone.
     Password {
         /// Argon2id salt.
@@ -140,7 +152,7 @@ impl KeyDerivation {
     }
 
     fn parse_header(head: &[u8]) -> Result<Self> {
-        if head.len() < MAGIC.len() + 3 || &head[..MAGIC.len()] != MAGIC {
+        if head.len() < MAGIC.len() + 3 || !has_magic(head) {
             return Err(retired_or_invalid(head));
         }
         let version = u16::from_le_bytes([head[8], head[9]]);
@@ -220,7 +232,7 @@ fn retired_or_invalid(head: &[u8]) -> Error {
 pub(crate) struct Trailer {
     /// Payload type; also bound into all record AADs.
     pub typ: PayloadType,
-    /// Original filename (single-file `.krf` only).
+    /// Original filename (single-file `.keres` only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// Total plaintext length across all chunks.
@@ -300,7 +312,7 @@ pub(crate) fn read_container<R: Read>(
     inner
         .read_exact(&mut first)
         .map_err(|_| Error::InvalidHeader)?;
-    if &first[..MAGIC.len()] != MAGIC {
+    if !has_magic(&first) {
         return Err(retired_or_invalid(&first));
     }
     let extra = match first[10] {
@@ -505,6 +517,17 @@ mod tests {
             |_| Ok(())
         )
         .is_err());
+    }
+
+    #[test]
+    fn legacy_magic_is_readable_but_not_written() {
+        let blob = seal(&pw_kd(), Some("pw"), None, b"legacy", PayloadType::File);
+        assert_eq!(&blob[..MAGIC.len()], MAGIC);
+
+        let mut legacy = blob;
+        legacy[..LEGACY_MAGIC.len()].copy_from_slice(LEGACY_MAGIC);
+        let t = unseal(&legacy, Some("pw"), None, PayloadType::File);
+        assert_eq!(t.size, 6);
     }
 
     #[test]

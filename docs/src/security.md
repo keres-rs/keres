@@ -1,6 +1,6 @@
 # Threat Model
 
-Krypton protects **data at rest** against an adversary with read access to the
+Keres protects **data at rest** against an adversary with read access to the
 storage medium: stolen laptops, leaked cloud backups, seized disks. The
 adversary may also attempt to modify stored ciphertext.
 
@@ -30,12 +30,12 @@ and coercion of the password itself.
 ### Associated Data
 
 Every AEAD operation binds the container's payload-type context
-(`"krypton-container-v1/file"`, …) plus the chunk index, and the trailer
+(`"keres-container-v1/file"`, …) plus the chunk index, and the trailer
 additionally binds a `/trailer` suffix. Consequences:
 
 - Reordering chunks between positions → authentication failure.
 - Truncating the file → detected by trailer cross-check of `size`/`chunk_count`.
-- Moving bytes between two `.krf` files (same password!) → fails because each
+- Moving bytes between two `.keres` files (same password!) → fails because each
   container derives an independent object salt/subkey.
 - The unauthenticated end-of-chunks marker cannot be exploited: the trailer is
   authenticated and its `chunk_count` must match exactly what preceded it.
@@ -63,7 +63,7 @@ have previously exfiltrated.
 
 - Atomic writes: temp file in the same directory + `fsync` + `rename`, so a
   crash mid-write can never corrupt a vault config or manifest.
-- Vault directories and `.krf` outputs are created with mode `0700`/`0600`
+- Vault directories and `.keres` outputs are created with mode `0700`/`0600`
   on Unix.
 - Names read back from containers are sanitized before path joins;
   absolute paths, `..`, separators and control characters are rejected —
@@ -74,7 +74,7 @@ have previously exfiltrated.
 ## Format Versioning Policy
 
 Since 0.4, all objects use one universal container: an 8-byte magic
-(`KRYPTON\0`, with a control byte so it can never occur in plain text),
+(`KERES\0\0\0`, with a control byte so it can never occur in plain text),
 a u16 envelope version, a key-derivation kind byte (HKDF-from-master for
 vault objects, Argon2id password for standalone files), chunk records and
 an authenticated trailer carrying the payload type (`file`, `directory`,
@@ -82,8 +82,10 @@ an authenticated trailer carrying the payload type (`file`, `directory`,
 
 Rules that keep this stable:
 
-1. The magic string never changes. Envelope revisions bump the version
-   field; readers reject unknown versions with `UnsupportedVersion`.
+1. New containers write the `KERES\0\0\0` magic. The pre-rename
+   `KRYPTON\0` magic is accepted on read for compatibility. Envelope
+   revisions bump the version field; readers reject unknown versions with
+   `UnsupportedVersion`.
 2. A released payload type never changes meaning; new object kinds are
    new trailer types with new context strings.
 3. Pre-0.4 formats are retired: readers were removed in 0.4 and old files
@@ -102,7 +104,7 @@ per-entry integrity report without writing plaintext to disk.
    master key but old ciphertext snapshots remain decryptable with the old
    password forever.
 3. **No deniability** — format magics and structure identify files as
-   Krypton containers.
+   Keres containers.
 4. **Single-factor** — no hardware-token or multi-party key splitting.
 5. **Filename leakage via size** — plaintext lengths are visible through
    ciphertext length (chunked at 64 KiB granularity).

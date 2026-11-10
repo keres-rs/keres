@@ -8,7 +8,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Monorepo workspace containing `krypton-core`, `krypton-cli`, and the
+- Monorepo workspace containing `keres`, `keres-cli`, and the
   documentation book.
 - Root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and `CHANGELOG.md`.
 - Workspace-level CI for tests, linting, rustdoc, package dry-runs, and the
@@ -16,8 +16,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- `krypton-core` now lives at `crates/krypton-core`.
-- `krypton-cli` now depends on the local core crate via a path dependency.
+- Renamed the project from Krypton to Keres:
+  - library crate and Rust import path: `keres`
+  - CLI package: `keres-cli`
+  - binary: `keres`
+  - environment variables: `KERES_HOME`, `KERES_PASSWORD`
+  - default single-file extension: `.keres`
+- New containers write the `KERES\0\0\0` magic. Pre-rename `KRYPTON\0`
+  containers remain readable.
+- `keres` now lives at `crates/keres`.
+- `keres-cli` now depends on the local library via a path dependency.
 - Release profile is defined once at the workspace root.
 
 ## [0.4.2] - 2026-08-26
@@ -38,7 +46,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Universal container format shared by `.krf` files, vault blobs, and
+- Universal container format shared by `.keres` files, vault blobs, and
   manifests.
 - Argon2id password derivation with per-container KDF parameters.
 - Per-object HKDF subkeys, counter nonces, and AAD binding for every record.
@@ -49,7 +57,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Pre-0.4 formats are retired; old files report `Error::RetiredFormat`.
 
-[Unreleased]: https://github.com/KryptonOSS/krypton-core/compare/v0.4.2...HEAD
-[0.4.2]: https://github.com/KryptonOSS/krypton-core/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/KryptonOSS/krypton-core/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/KryptonOSS/krypton-core/releases/tag/v0.4.0
+[Unreleased]: https://github.com/KeresOSS/keres/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/KeresOSS/keres/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/KeresOSS/keres/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/KeresOSS/keres/releases/tag/v0.4.0

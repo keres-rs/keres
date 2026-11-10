@@ -1,32 +1,32 @@
-# Introduction to Krypton
+# Introduction to Keres
 
 A memory-safe Rust library and command-line tool for modern file encryption
 and secure vaults, using Argon2id and AES-256-GCM with encrypted filenames
 and a universal container format.
 
-Krypton is built for modern security standards and currently in alpha phase therefore the public API may change in future and may break.
+Keres is built for modern security standards and currently in alpha phase therefore the public API may change in future and may break.
 
-`krypton` provides two complementary encrypted-
+`keres` provides two complementary encrypted-
 storage modes over one shared cryptographic core:
 
 | Mode | Entry points | Use case |
 |---|---|---|
-| **Single-file** | `encrypt_file`, `decrypt_file` | Encrypt an individual file into a self-contained `.krf` container |
+| **Single-file** | `encrypt_file`, `decrypt_file` | Encrypt an individual file into a self-contained `.keres` container |
 | **Vault** | `Vault` struct | A directory holding many entries (files *and* directories) under one password, with an encrypted index |
 
 Both modes share:
 
-- One universal wire format (`crates/krypton-core/src/container.rs`) with a
+- One universal wire format (`crates/keres/src/container.rs`) with a
   stable magic and structured versioning.
-- One chunk engine (`crates/krypton-core/src/stream.rs`, 64 KiB records).
-- One primitive layer (`crates/krypton-core/src/crypto.rs`): AES-256-GCM,
+- One chunk engine (`crates/keres/src/stream.rs`, 64 KiB records).
+- One primitive layer (`crates/keres/src/crypto.rs`): AES-256-GCM,
   Argon2id, HKDF-SHA256.
 
 The crate is deliberately small: under 2k lines of library code, no async
 runtime, and no I/O beyond `std::fs`.
 
 ```
-crates/krypton-core/src/
+crates/keres/src/
 ├── lib.rs          crate docs, prelude, re-exports
 ├── error.rs        Error enum (thiserror), Result alias
 ├── crypto.rs       AES-GCM / Argon2id / HKDF / CSPRNG wrappers
@@ -110,7 +110,7 @@ Rules that keep the ecosystem stable forever:
 Everything public hangs off four re-exported items plus modules:
 
 ```rust
-use krypton::{encrypt_file, decrypt_file, Vault};
+use keres::{encrypt_file, decrypt_file, Vault};
 use std::path::Path;
 
 // Single file: encrypt, then decrypt back (name recovered from trailer).
@@ -135,7 +135,7 @@ state). All fallible APIs return `Result` with the taxonomy above; no
 panics on hostile input (test-enforced).
 
 Module-level documentation in rustdoc mirrors this document; build with
-`cargo doc -p krypton-core --open`.
+`cargo doc -p keres --open`.
 
 ---
 

@@ -1,10 +1,10 @@
 # Installation Guide
 
-Krypton is a Cargo workspace with three parts. Install only what you need:
+Keres is a Cargo workspace with three parts. Install only what you need:
 
-- **Library** — add `krypton-core` to a Rust project. See
-  [Krypton Core](core-install.md).
-- **CLI** — install the `krypton` binary. See [Krypton CLI](cli-install.md).
+- **Library** — add `keres` to a Rust project. See
+  [Keres library](core-install.md).
+- **CLI** — install the `keres` binary. See [Keres CLI](cli-install.md).
 - **From source** — clone the monorepo and build the workspace. See
   [Building from source](full-install.md).
 

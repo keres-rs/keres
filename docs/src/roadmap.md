@@ -42,7 +42,7 @@ property will never be accepted for a compatibility or convenience win.
   exist that no manifest record references. Add a `verify --prune` /
   compaction routine that walks `d/` and deletes unreferenced blobs.
 - **Dependency slimming: drop `walkdir`** — its single production use is
-  the directory traversal in `add_directory_tree` (`crates/krypton-core/src/vault/mod.rs`).
+  the directory traversal in `add_directory_tree` (`crates/keres/src/vault/mod.rs`).
   Replace with a ~40-line `std::fs::read_dir` walker preserving exact
   semantics (pre-order, siblings sorted by file name, parents before
   children, symlinks and special files skipped). Removes `walkdir` and
@@ -57,7 +57,7 @@ property will never be accepted for a compatibility or convenience win.
   (limitation 4). Must remain strictly optional; plain password vaults are
   the default and always supported.
 - **Size hiding (limitation 5)** — optional fixed-size padding buckets
-  for `.krf` output and/or random trailing padding before the end marker,
+  for `.keres` output and/or random trailing padding before the end marker,
   trading space for length privacy. Needs care: padding must be covered by
   the trailer's authenticated `size`.
 - **External security audit** — pay for a professional review of the
@@ -73,5 +73,5 @@ property will never be accepted for a compatibility or convenience win.
   hidden-volume schemes conflict with authenticated formats and invite
   user-error catastrophes. Revisit only with a rigorous design.
 - **Backward compatibility shims** — pre-0.4 formats stay retired.
-  Migration is a one-time `krypton migrate` helper only if demand exists.
+  Migration is a one-time `keres migrate` helper only if demand exists.
 

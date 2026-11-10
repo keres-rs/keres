@@ -1,6 +1,6 @@
-# Krypton Documentation
+# Keres Documentation
 
-The documentation sources for the Krypton monorepo. They are built with
+The documentation sources for the Keres monorepo. They are built with
 [mdBook](https://rust-lang.github.io/mdBook/).
 
 ```console

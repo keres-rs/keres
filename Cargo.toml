@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/krypton-core", "crates/krypton-cli"]
+members = ["crates/keres", "crates/keres-cli"]
 resolver = "2"
 
 [workspace.package]
@@ -8,7 +8,7 @@ edition = "2021"
 rust-version = "1.75"
 authors = ["Yash Sharma"]
 license = "Apache-2.0"
-repository = "https://github.com/KryptonOSS/krypton-core"
+repository = "https://github.com/KeresOSS/keres"
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["derive"] }
@@ -19,5 +19,5 @@ lto = true
 codegen-units = 1
 strip = true
 
-[profile.release.package.krypton-cli]
+[profile.release.package.keres-cli]
 opt-level = "z"

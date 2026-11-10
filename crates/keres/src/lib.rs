@@ -1,4 +1,4 @@
-//! # krypton
+//! # keres
 //!
 //! Encrypted vaults and single-file encryption with full metadata
 //! protection, built on AES-256-GCM and Argon2id.
@@ -16,7 +16,7 @@
 //! * **Streaming** — 64 KiB chunks with constant memory use for files of any
 //!   size.
 //! * **Metadata privacy** — original filenames never appear unencrypted,
-//!   neither in `.krf` containers nor inside vaults.
+//!   neither in `.keres` containers nor inside vaults.
 //! * **Crash safety** — vault configs, manifests and outputs are written via
 //!   temp file + rename; interrupted operations never leave half-written
 //!   plaintext or bricked containers.
@@ -29,12 +29,12 @@
 //! use std::path::Path;
 //!
 //! // Single file round trip.
-//! let out = krypton::encrypt_file("correct horse", Path::new("document.pdf"), None).unwrap();
-//! let name = krypton::decrypt_file("correct horse", &out, Path::new("restored.pdf")).unwrap();
+//! let out = keres::encrypt_file("correct horse", Path::new("document.pdf"), None).unwrap();
+//! let name = keres::decrypt_file("correct horse", &out, Path::new("restored.pdf")).unwrap();
 //! assert_eq!(name, "document.pdf");
 //!
 //! // Multi-file vault.
-//! let mut vault = krypton::Vault::new("myvault".into());
+//! let mut vault = keres::Vault::new("myvault".into());
 //! vault.init("correct horse").unwrap();
 //! vault.unlock("correct horse").unwrap();
 //! vault.add(Path::new("secret.pdf"), None).unwrap();
@@ -64,10 +64,10 @@
 //!
 //!
 //! ```
-//! use krypton::{decrypt_file, Error};
+//! use keres::{decrypt_file, Error};
 //! use std::path::Path;
 //!
-//! match decrypt_file("pw", Path::new("backup.krf"), Path::new("out.bin")) {
+//! match decrypt_file("pw", Path::new("backup.keres"), Path::new("out.bin")) {
 //!     Ok(original_name) => println!("restored {original_name}"),
 //!     Err(Error::Authentication) => eprintln!("wrong password or corrupted data"),
 //!     Err(e) => eprintln!("failed: {e}"),
@@ -99,7 +99,7 @@ mod fsutil;
 pub mod kdf;
 /// Entry-name validation helpers.
 pub mod sanitize;
-/// Single-file `.krf` containers.
+/// Single-file `.keres` containers.
 mod single_file;
 /// Chunked streaming encryption engine.
 mod stream;

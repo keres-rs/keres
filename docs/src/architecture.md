@@ -35,7 +35,7 @@ never unbounded allocation or infinite loops.
 Two independent derivations exist, selected per container by a kind byte:
 
 ```
-Standalone .krf (kind = password):
+Standalone .keres (kind = password):
 
   password ──Argon2id(argon_salt, params)──► KEK ──HKDF(object_salt)──► content key
 
@@ -61,8 +61,8 @@ Properties that follow:
 
 ## The universal container format
 
-Every object the library produces — `.krf` files, vault blobs, manifests —
-is one envelope. Defined in `crates/krypton-core/src/container.rs`; constants are public where
+Every object the library produces — `.keres` files, vault blobs, manifests —
+is one envelope. Defined in `crates/keres/src/container.rs`; constants are public where
 meaningful (`MAGIC`, `ENVELOPE_VERSION`).
 
 ### Wire layout
@@ -70,7 +70,7 @@ meaningful (`MAGIC`, `ENVELOPE_VERSION`).
 ```text
 offset  size                     field
 ────────────────────────────────────────────────────────────────
-0       8    "KRYPTON\0"          magic (NUL is a control byte:
+0       8    "KERES\0\0\0"          magic (NUL is a control byte:
                                   cannot occur in plain text)
 8       2    u16 LE               envelope version (currently 1)
 10      1    kind                 0 = HKDF-from-master
@@ -89,14 +89,16 @@ Header sizes: 43 bytes (kind 0) or 87 bytes (kind 1).
 
 ### Header authentication strategy
 
-No bytes of the header are MAC'd directly — instead **every header byte
-participates in key derivation**. Flipping any bit of magic, version, kind
-or salts produces a different content key, and the first GCM tag check
-fails. This makes the whole header authenticated *implicitly*, without a
-separate signature pass.
+No separate header MAC is needed. The header is authenticated **implicitly**:
+the magic and version are checked directly, while the kind, salts, and KDF
+parameters feed key derivation. Flipping any of those bytes yields a wrong
+key or an early parse error, so the first GCM tag check fails.
 
 Version mismatch fails early with `UnsupportedVersion(v)`; retired magics
 (`KRYPTON2\n`, `KRYPTON3\n`) fail with the explicit `RetiredFormat` error.
+
+The pre-rename `KRYPTON\0` magic is accepted on read but never written. New
+containers use `KERES\0\0\0`; existing containers keep working.
 
 ### Trailer
 
@@ -106,7 +108,7 @@ with the same content key under the reserved nonce `[0xFF; 12]`:
 ```json
 {
   "typ": "file" | "directory" | "manifest",
-  "name": "original-filename.txt",   // .krf only, optional
+  "name": "original-filename.txt",   // .keres only, optional
   "size": 12345,                      // total plaintext length
   "chunk_count": 1                    // number of preceding records
 }
@@ -121,13 +123,13 @@ even if a naive reader would have accepted the prefix.
 ### Identity binding
 
 Containers carry a caller-supplied *identity* string that participates in
-key derivation (`info = "krypton-container-v1/" ‖ identity`) :
+key derivation (`info = "keres-container-v1/" ‖ identity`) :
 
 | Object | Identity | Effect |
 |---|---|---|
 | Vault entry blob | entry path, e.g. `"photos/a.jpg"` | copying one entry's blob over another's slot fails authentication |
 | Manifest | `"vault-manifest"` | fixed constant; manifest location is canonical |
-| Standalone `.krf` | empty | files are self-contained; nothing to bind |
+| Standalone `.keres` | empty | files are self-contained; nothing to bind |
 
 This closes the *blob-transplant* attack class entirely: an attacker who
 swaps two blobs in the vault directory gets `Corrupted` reports from
@@ -144,7 +146,7 @@ core reason the format can evolve without a format zoo.
 
 ## Chunking, nonces and AAD binding
 
-`crates/krypton-core/src/stream.rs` implements record framing shared by all containers.
+`crates/keres/src/stream.rs` implements record framing shared by all containers.
 
 ### Chunk records
 
@@ -180,9 +182,9 @@ Every GCM operation binds context. Nothing is ever decrypted "bare":
 
 | Operation | AAD |
 |---|---|
-| Data chunk *i* | `"krypton-container-v1/{file\|directory\|manifest}"` ‖ index bytes |
+| Data chunk *i* | `"keres-container-v1/{file\|directory\|manifest}"` ‖ index bytes |
 | Trailer | chunk context ‖ index ‖ `"/trailer"` |
-| vault.config wrap | `"krypton-vault-config-v2"` |
+| vault.config wrap | `"keres-vault-config-v2"` |
 
 Consequences:
 
@@ -198,7 +200,7 @@ Consequences:
 
 ---
 
-## Single-file mode (.krf)
+## Single-file mode (.keres)
 
 `encrypt_file(password, input, output)`:
 
@@ -208,7 +210,7 @@ Consequences:
 3. Writes atomically: temp file (mode 0600) in the destination directory →
    fsync → rename. On Windows: remove-then-rename.
 4. If no output path is given, produces `<sha256(argon_salt ‖ object_salt
-   )>.krf` — a random-looking name leaking nothing about content.
+   )>.keres` — a random-looking name leaking nothing about content.
 
 `decrypt_file(password, input, output)` authenticates the whole container
 while streaming, recovers the original filename from the trailer, sanitizes
@@ -246,7 +248,7 @@ before any key exists:
 ```
 
 The master key is generated once at `init`, encrypted under the KEK with
-AAD `"krypton-vault-config-v2"` and the fixed config nonce (safe: unique
+AAD `"keres-vault-config-v2"` and the fixed config nonce (safe: unique
 KEK, single short message). Wrong password and tampered config are
 indistinguishable (`Authentication`) by design.
 

@@ -13,7 +13,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use krypton::Vault;
+//! use keres::Vault;
 //! use std::path::Path;
 //!
 //! let mut vault = Vault::new("myvault".into());
@@ -50,7 +50,7 @@ use manifest::{EntryMetadata, ManifestMap};
 /// # Example
 ///
 /// ```no_run
-/// use krypton::Vault;
+/// use keres::Vault;
 /// use std::path::Path;
 ///
 /// let mut vault = Vault::new("myvault".into());
@@ -76,7 +76,7 @@ use manifest::{EntryMetadata, ManifestMap};
 /// vault.change_password("correct horse battery staple", "new secret")?;
 ///
 /// vault.lock();
-/// # Ok::<(), krypton::Error>(())
+/// # Ok::<(), keres::Error>(())
 /// ```
 pub struct Vault {
     path: PathBuf,
@@ -155,9 +155,9 @@ impl Vault {
     /// permissions on Unix; the config is written atomically.
     ///
     /// ```no_run
-    /// let mut vault = krypton::Vault::new("secrets".into());
+    /// let mut vault = keres::Vault::new("secrets".into());
     /// vault.init("correct horse")?;
-    /// # Ok::<(), krypton::Error>(())
+    /// # Ok::<(), keres::Error>(())
     /// ```
     pub fn init(&mut self, password: &str) -> Result<()> {
         if self.exists() {
@@ -211,12 +211,12 @@ impl Vault {
     /// never a dangling index.
     ///
     /// ```no_run
-    /// let mut vault = krypton::Vault::new("secrets".into());
+    /// let mut vault = keres::Vault::new("secrets".into());
     /// vault.unlock("correct horse")?;
     ///
     /// vault.add(std::path::Path::new("notes.txt"), None)?;
     /// vault.add(std::path::Path::new("~/docs"), Some("docs"))?; // whole tree
-    /// # Ok::<(), krypton::Error>(())
+    /// # Ok::<(), keres::Error>(())
     /// ```
     pub fn add(&mut self, source: &Path, name: Option<&str>) -> Result<()> {
         let master = self.require_unlocked()?;
@@ -305,10 +305,10 @@ impl Vault {
     /// attempt aborts the operation.
     ///
     /// ```no_run
-    /// let vault = krypton::Vault::new("secrets".into());
+    /// let vault = keres::Vault::new("secrets".into());
     /// let written = vault.extract("docs", std::path::Path::new("./restored"))?;
     /// println!("restored to {}", written.display());
-    /// # Ok::<(), krypton::Error>(())
+    /// # Ok::<(), keres::Error>(())
     /// ```
     pub fn extract(&self, name: &str, dest: &Path) -> Result<PathBuf> {
         let master = self.require_unlocked()?;
@@ -350,9 +350,9 @@ impl Vault {
     /// Works regardless of lock state and leaves the lock state unchanged.
     ///
     /// ```no_run
-    /// let mut vault = krypton::Vault::new("secrets".into());
+    /// let mut vault = keres::Vault::new("secrets".into());
     /// vault.change_password("old horse", "new horse")?;
-    /// # Ok::<(), krypton::Error>(())
+    /// # Ok::<(), keres::Error>(())
     /// ```
     pub fn change_password(&mut self, old_password: &str, new_password: &str) -> Result<()> {
         let config = self.load_config()?;
@@ -376,14 +376,14 @@ impl Vault {
     /// Restores the prior lock state when done.
     ///
     /// ```no_run
-    /// let mut vault = krypton::Vault::new("secrets".into());
+    /// let mut vault = keres::Vault::new("secrets".into());
     /// let report = vault.verify("correct horse")?;
     /// if report.missing.is_empty() && report.corrupted.is_empty() {
     ///     println!("all {} entries authenticated", report.total_entries);
     /// } else {
     ///     eprintln!("missing: {:?}, corrupted: {:?}", report.missing, report.corrupted);
     /// }
-    /// # Ok::<(), krypton::Error>(())
+    /// # Ok::<(), keres::Error>(())
     /// ```
     pub fn verify(&mut self, password: &str) -> Result<IntegrityReport> {
         let was_unlocked = self.is_unlocked();

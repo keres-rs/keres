@@ -14,7 +14,7 @@ pub(crate) fn sibling_temp_path(target: &Path) -> PathBuf {
     let name = target
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "krypton-out".into());
+        .unwrap_or_else(|| "keres-out".into());
     let rnd = crypto::random_nonce();
     dir.join(format!(
         ".{name}.tmp-{}-{}",
