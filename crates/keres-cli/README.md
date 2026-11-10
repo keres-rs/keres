@@ -60,7 +60,7 @@ $ keres remove personal notes.txt
 ```
 
 Passwords are read from a terminal prompt, or from the `KERES_PASSWORD`
-environment variable for scripts and CI. The core library's threat model still
+environment variable for scripts and CI. The library's threat model still
 applies: see [SECURITY.md](https://github.com/KeresOSS/keres/blob/main/SECURITY.md).
 
 ## Development

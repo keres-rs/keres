@@ -11,5 +11,5 @@ Both modes share the same container format, chunk engine, and cryptographic
 primitives. Choose the library if you are embedding Keres in a Rust
 application; choose the CLI for ad-hoc files and terminal workflows.
 
-- [Keres library usage](core-usage.md)
+- [Keres library usage](library-usage.md)
 - [Keres CLI usage](cli-usage.md)

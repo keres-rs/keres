@@ -1,6 +1,6 @@
 # Building from source
 
-The core, CLI, and documentation live in one repository:
+The library, CLI, and documentation live in one repository:
 
 ```console
 $ git clone https://github.com/KeresOSS/keres.git

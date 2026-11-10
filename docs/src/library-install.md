@@ -33,4 +33,4 @@ $ cargo doc -p keres --open
 $ cargo test -p keres
 ```
 
-Next: [use the library](core-usage.md).
+Next: [use the library](library-usage.md).
