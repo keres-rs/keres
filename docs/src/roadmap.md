@@ -9,6 +9,11 @@ property will never be accepted for a compatibility or convenience win.
 - **Fuzzing targets** — `cargo-fuzz` harnesses for `read_container`,
   `read_entry`, manifest/config parsing and name sanitization. The parser
   surface is small; it should be provably robust against hostile input.
+  *(Done: `fuzz/` covers the container, manifest, config, and sanitizer
+  parsers, with a seeded corpus and a weekly workflow.)*
+- **Published test vectors and benchmarks** — a committed deterministic
+  `.krs` fixture with a pinned SHA-256, plus Criterion throughput benches.
+  *(Done.)*
 - **Memory locking** — evaluate `memsec`/`region` behind a tiny `unsafe`
   boundary (feature-gated) so master keys can be `mlock`ed and core dumps
   suppressed. Requires relaxing `forbid(unsafe_code)` to
@@ -20,9 +25,9 @@ property will never be accepted for a compatibility or convenience win.
 - **Concurrent-access safety** — non-blocking advisory locks around every
   vault read and write, so a second process fails fast with `VaultBusy`
   instead of clobbering the manifest. *(Done.)*
-- **CI hardening** — Windows and macOS test jobs are in place; remaining
-  work is `cargo-audit` / `cargo-deny` supply-chain checks and signed
-  release artifacts.
+- **CI hardening** — Windows and macOS test jobs are in place, and
+  `cargo-deny` gates advisories, licenses, and sources. Remaining work is
+  signed release artifacts.
 
 ## Next (0.5.x)
 

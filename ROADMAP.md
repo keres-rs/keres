@@ -11,9 +11,11 @@ matters most for the monorepo.
       clobber the manifest.
 - [x] Cross-platform CI (Windows and macOS) and an atomic replace path for
       Windows.
-- [ ] Fuzzing for container, manifest, and config parsers.
-- [ ] `cargo-audit` / `cargo-deny` supply-chain checks and signed releases.
-- [ ] Published test vectors for the container format.
+- [x] Fuzzing for container, manifest, and config parsers.
+- [x] `cargo-deny` supply-chain checks.
+- [ ] Signed release artifacts.
+- [x] Published test vectors for the container format.
+- [x] Criterion benchmarks for the container pipeline.
 
 ## Next
 

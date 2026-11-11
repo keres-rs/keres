@@ -15,6 +15,7 @@ The workspace layout:
 
 - `crates/keres/` — library: container format, crypto, vault.
 - `crates/keres-cli/` — the `keres` binary.
+- `fuzz/` — `cargo-fuzz` targets (a separate, excluded workspace).
 - `docs/` — this mdBook.
 
 ## Before opening a pull request
@@ -25,9 +26,30 @@ Run the same gates as CI:
 $ cargo fmt --all -- --check
 $ cargo clippy --workspace --all-targets -- -D warnings
 $ cargo test --workspace --all-targets
+$ cargo test --workspace --doc
+$ cargo deny check
 $ cargo doc --workspace --no-deps
 $ mdbook build docs
 ```
+
+## Fuzzing and benchmarks
+
+```console
+$ cargo bench -p keres --bench throughput
+$ cd fuzz
+$ cargo fuzz run read_container
+$ cargo fuzz run parse_manifest
+$ cargo fuzz run parse_config
+$ cargo fuzz run sanitize
+```
+
+Fuzz targets use a nightly toolchain (see `fuzz/rust-toolchain.toml`). The
+weekly `Fuzz` workflow runs each target for 60 seconds.
+
+Format test vectors live in `crates/keres/tests/vectors/`; see
+[Test vectors](./test-vectors.md). Never regenerate a fixture to make a test
+pass — a digest change means the wire format changed and needs a deliberate
+review.
 
 ## Guidelines
 

@@ -75,6 +75,16 @@ pub(crate) fn load(vault_dir: &Path, master: &Key) -> Result<ManifestMap> {
         .read_to_end(&mut bytes)
         .map_err(|_| Error::InvalidVault)?;
 
+    decode(&bytes, master)
+}
+
+/// Decodes and authenticates manifest bytes. Shared by [`load`] and the
+/// hidden fuzz entry point.
+pub(crate) fn decode(bytes: &[u8], master: &Key) -> Result<ManifestMap> {
+    if bytes.len() as u64 > MAX_MANIFEST_LEN {
+        return Err(Error::InvalidVault);
+    }
+
     let mut json = Zeroizing::new(Vec::new());
     container::read_container(
         Cursor::new(bytes),

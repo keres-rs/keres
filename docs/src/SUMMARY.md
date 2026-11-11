@@ -12,6 +12,7 @@
   - [Keres GUI (separate repository)](./gui-usage.md)
 - [Architecture](./architecture.md)
 - [Security](./security.md)
+- [Test vectors](./test-vectors.md)
 - [Roadmap](./roadmap.md)
 - [Contributing](./contributing.md)
 - [Release Notes](./release.md)

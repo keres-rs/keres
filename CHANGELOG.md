@@ -34,6 +34,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `keres` now lives at `crates/keres`.
 - `keres-cli` now depends on the local library via a path dependency.
 - Release profile is defined once at the workspace root.
+- Minimum supported Rust version is now 1.85, matching the current
+  dependency graph (`clap`, `rpassword`, `zeroize`, `base64ct`).
 
 ### Security
 

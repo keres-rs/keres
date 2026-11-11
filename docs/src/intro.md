@@ -151,7 +151,7 @@ Current suite (all green at time of writing):
   directory trees, password rotation and full-tamper sweeps.
 - Gates enforced locally and in CI: `cargo test`, `clippy -D warnings`,
   `fmt --check`, `cargo doc` warning-free, `cargo publish --dry-run`.
-- GitHub Actions: test matrix (stable + MSRV 1.75), lint job, docs job,
+- GitHub Actions: test matrix (stable + MSRV 1.85), lint job, docs job,
   publish-check; the workspace CI also builds the CLI and the docs book.
 
 Notable regression tests born from audits:
