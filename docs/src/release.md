@@ -7,6 +7,8 @@
   `keres-cli`, binary `keres`, and `.krs` single-file containers.
 - Added advisory vault locking: writers take an exclusive lock, readers a
   shared one, and concurrent access returns `Error::VaultBusy`.
+- Added `Vault::replace` and `Vault::prune_orphans` (`keres replace`,
+  `keres verify --prune`).
 - Added workspace-wide CI for tests on Linux, Windows, and macOS, plus
   linting, rustdoc, package dry-runs, and the mdBook build.
 - Added root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and

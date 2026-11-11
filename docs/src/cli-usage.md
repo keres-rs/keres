@@ -23,9 +23,11 @@ Vaults are named and stored under `~/.keres/vaults/<name>` by default.
 $ keres init personal
 $ keres add personal ./notes.txt
 $ keres add personal ./photos --name photos
+$ keres replace personal ./notes-v2.txt notes.txt
 $ keres list personal
 $ keres extract personal photos ./restored
 $ keres verify personal
+$ keres verify personal --prune
 $ keres change-password personal
 $ keres remove personal notes.txt
 ```
@@ -36,10 +38,11 @@ $ keres remove personal notes.txt
 |---|---|
 | `init <vault>` | Create a new vault |
 | `add <vault> <path> [--name NAME]` | Add a file or directory tree |
+| `replace <vault> <path> <name>` | Replace an existing file entry |
 | `remove <vault> <name> [--force]` | Remove an entry and, for directories, its subtree |
 | `list <vault>` | List top-level entries |
 | `extract <vault> <name> <dest> [--force]` | Restore an entry |
-| `verify <vault>` | Authenticate every entry |
+| `verify <vault> [--prune]` | Authenticate every entry; `--prune` deletes unreferenced blobs |
 | `change-password <vault>` | Re-wrap the master key under a new password |
 | `encrypt <input> [output] [--force]` | Encrypt one file |
 | `decrypt <input> <output> [--force]` | Decrypt one file |
@@ -50,6 +53,11 @@ $ keres remove personal notes.txt
 `--force` when standard input is not a terminal. `extract`, `encrypt`, and
 `decrypt` refuse to overwrite an existing destination unless `--force` is
 given.
+
+`verify --prune` deletes ciphertext blobs under `d/` that no manifest entry
+references (left behind by an interrupted add) and cleans up stale temp
+files. It only prunes after a successful integrity check and refuses to run
+if the manifest is missing.
 
 ## Passwords in scripts
 

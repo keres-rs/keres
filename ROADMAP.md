@@ -26,7 +26,7 @@ matters most for the monorepo.
 - [ ] Entry metadata (mtime, mode) and `list --recursive` / `stat`.
 - [ ] Multi-recipient keys (X25519), LUKS-style key slots, and a printable
       recovery kit.
-- [ ] Orphan garbage collection (`verify --prune`).
+- [x] Orphan garbage collection (`verify --prune`).
 - [ ] Parallel chunk pipeline.
 
 ## Later

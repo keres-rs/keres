@@ -194,6 +194,15 @@ impl Vault {
         if !self.exists() {
             return Err(Error::VaultNotFound);
         }
+        // A shared lock keeps `unlock` from reading the config in the middle
+        // of a concurrent `change_password` (which holds the exclusive lock).
+        let _lock = VaultLock::shared(&self.path)?;
+        self.unlock_inner(password)
+    }
+
+    /// Unlocks without acquiring the advisory lock. Callers that already hold
+    /// a vault lock must use this to avoid a self-conflict.
+    fn unlock_inner(&mut self, password: &str) -> Result<()> {
         let config = self.load_config()?;
         self.keystore.unlock(password, &config)
     }
@@ -269,6 +278,53 @@ impl Vault {
         }
 
         // Phase 2: commit index atomically.
+        manifest::save(&self.path, &all, &master)?;
+        Ok(())
+    }
+
+    /// Replaces the contents of an existing file entry.
+    ///
+    /// `source` must be a regular file and `name` must refer to a file entry
+    /// (remove a directory tree first). The new blob is written before the
+    /// manifest is committed, matching [`Vault::add`]: a crash can leave
+    /// stale size metadata, but never a dangling index.
+    ///
+    /// ```no_run
+    /// let mut vault = keres::Vault::new("secrets".into());
+    /// vault.unlock("correct horse")?;
+    /// vault.replace(std::path::Path::new("notes.txt"), "notes.txt")?;
+    /// # Ok::<(), keres::Error>(())
+    /// ```
+    pub fn replace(&mut self, source: &Path, name: &str) -> Result<()> {
+        let master = self.require_unlocked()?;
+        let _lock = VaultLock::exclusive(&self.path)?;
+        sanitize::validate_new_name(name)?;
+
+        let source = source
+            .canonicalize()
+            .map_err(|_| Error::invalid_name(source.display()))?;
+        if !source.is_file() {
+            return Err(Error::invalid_name(source.display()));
+        }
+
+        let mut all = manifest::load(&self.path, &master)?;
+        let existing = all
+            .get(name)
+            .ok_or_else(|| Error::EntryNotFound(preview(name)))?;
+        if existing.is_directory {
+            return Err(Error::Operation(
+                "cannot replace a directory entry; remove it first".into(),
+            ));
+        }
+
+        let meta = EntryMetadata {
+            original_name: name.to_string(),
+            original_size: fs::metadata(&source)?.len(),
+            is_directory: false,
+            children: None,
+        };
+        blobs::write_entry(&self.path, &master, name, &meta, Some(&source))?;
+        all.insert(name.to_string(), meta);
         manifest::save(&self.path, &all, &master)?;
         Ok(())
     }
@@ -379,7 +435,7 @@ impl Vault {
         config.unwrap_master_key(old_password)?;
 
         if !self.keystore.is_unlocked() {
-            self.unlock(old_password)?;
+            self.unlock_inner(old_password)?;
         }
 
         let new_config = self.keystore.rotate_password(new_password)?;
@@ -410,7 +466,7 @@ impl Vault {
         let _lock = VaultLock::shared(&self.path)?;
         let was_unlocked = self.is_unlocked();
         if !was_unlocked {
-            self.unlock(password)?;
+            self.unlock_inner(password)?;
         }
         let result = self.verify_unlocked();
         if !was_unlocked {
@@ -439,6 +495,63 @@ impl Vault {
         }
 
         Ok(report)
+    }
+
+    /// Deletes blobs that no manifest record references.
+    ///
+    /// Failed or interrupted adds can leave ciphertext behind that the
+    /// manifest never mentions. They are harmless but waste space. Pruning
+    /// requires an unlocked vault and takes the exclusive lock. Only files
+    /// ending in `.enc` (other than `.manifest.enc`) and leftover `.tmp-*`
+    /// files under `d/` are candidates, so unrelated files are never touched.
+    ///
+    /// Refuses to run when the manifest is missing: treating that as an empty
+    /// index would delete every blob.
+    pub fn prune_orphans(&mut self) -> Result<usize> {
+        let master = self.require_unlocked()?;
+        let _lock = VaultLock::exclusive(&self.path)?;
+
+        let data_dir = self.path.join("d");
+        let manifest_file = data_dir.join(".manifest.enc");
+        if !manifest_file.is_file() {
+            return Err(Error::InvalidVault);
+        }
+
+        let all = manifest::load(&self.path, &master)?;
+        let referenced: std::collections::HashSet<PathBuf> = all
+            .keys()
+            .map(|name| blobs::blob_path(&self.path, &master, name))
+            .collect();
+
+        let mut removed = 0usize;
+        for entry in walkdir::WalkDir::new(&data_dir).min_depth(1) {
+            let entry = entry.map_err(|_| Error::InvalidVault)?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if path == manifest_file.as_path() || referenced.contains(path) {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy();
+            if !name.ends_with(".enc") && !name.contains(".tmp-") {
+                continue;
+            }
+            fs::remove_file(path)?;
+            removed += 1;
+        }
+
+        // Drop shard directories that pruning emptied. Best-effort: a
+        // non-empty directory is simply left in place.
+        if let Ok(shards) = fs::read_dir(&data_dir) {
+            for shard in shards.flatten() {
+                if shard.path().is_dir() {
+                    let _ = fs::remove_dir(shard.path());
+                }
+            }
+        }
+
+        Ok(removed)
     }
 }
 

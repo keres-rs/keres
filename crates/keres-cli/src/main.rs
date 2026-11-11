@@ -113,6 +113,15 @@ enum Commands {
         #[arg(short, long)]
         name: Option<String>,
     },
+    /// Replace an existing file entry with a new file.
+    Replace {
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
+        vault: String,
+        /// Path to the new file contents.
+        path: PathBuf,
+        /// Name of the existing file entry in the vault.
+        name: String,
+    },
     /// Remove a file or folder from the vault.
     Remove {
         /// Vault name (stored in `~/.keres/vaults/<name>`).
@@ -149,6 +158,9 @@ enum Commands {
     Verify {
         /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
+        /// After a successful check, delete blobs that no entry references.
+        #[arg(long)]
+        prune: bool,
     },
     /// Encrypt a single file.
     Encrypt {
@@ -333,6 +345,14 @@ fn run(command: Commands, passwords: &PasswordSource) -> Result<()> {
             v.add(&path, name.as_deref())?;
             println!("Added successfully!");
         }
+        Commands::Replace { vault, path, name } => {
+            let dir = existing_vault_path(&vault)?;
+            let password = passwords.read("Enter vault password")?;
+            let mut v = Vault::new(dir);
+            v.unlock(password.as_str())?;
+            v.replace(&path, &name)?;
+            println!("Replaced successfully!");
+        }
         Commands::Remove { vault, name, force } => {
             let dir = existing_vault_path(&vault)?;
             if !force
@@ -401,14 +421,20 @@ fn run(command: Commands, passwords: &PasswordSource) -> Result<()> {
             Vault::new(dir).change_password(old.as_str(), new.as_str())?;
             println!("Password changed successfully!");
         }
-        Commands::Verify { vault } => {
+        Commands::Verify { vault, prune } => {
             let dir = existing_vault_path(&vault)?;
             let password = passwords.read("Enter vault password")?;
-            let report = Vault::new(dir).verify(password.as_str())?;
+            let mut v = Vault::new(dir);
+            let report = v.verify(password.as_str())?;
             let ok = report.missing.is_empty() && report.corrupted.is_empty();
             print_report(&report);
             if !ok {
                 std::process::exit(1);
+            }
+            if prune {
+                v.unlock(password.as_str())?;
+                let removed = v.prune_orphans()?;
+                println!("Pruned {removed} orphaned file(s)");
             }
         }
         Commands::Encrypt {

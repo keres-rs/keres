@@ -47,8 +47,9 @@ property will never be accepted for a compatibility or convenience win.
 - **Streaming public API** — `Read`/`Write` adapter types so library users
   can pipe containers without buffering whole objects.
 - **Orphan garbage collection** — after failed adds/removals, blobs may
-  exist that no manifest record references. Add a `verify --prune` /
-  compaction routine that walks `d/` and deletes unreferenced blobs.
+  exist that no manifest record references. `verify --prune` /
+  `Vault::prune_orphans` walks `d/` and deletes unreferenced blobs and stale
+  temp files. *(Done.)*
 - **Dependency slimming: drop `walkdir`** — its single production use is
   the directory traversal in `add_directory_tree` (`crates/keres/src/vault/mod.rs`).
   Replace with a ~40-line `std::fs::read_dir` walker preserving exact

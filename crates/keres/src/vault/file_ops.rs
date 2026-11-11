@@ -22,7 +22,7 @@ use crate::vault::manifest::EntryMetadata;
 ///
 /// The hash binds the master key so paths are stable within a vault and
 /// opaque outside it.
-fn blob_path(vault_dir: &Path, master: &Key, entry_path: &str) -> PathBuf {
+pub(crate) fn blob_path(vault_dir: &Path, master: &Key, entry_path: &str) -> PathBuf {
     let mut hasher = Sha256::new();
     hasher.update(master.expose());
     hasher.update(entry_path.as_bytes());

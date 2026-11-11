@@ -16,6 +16,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Advisory vault locking (`vault.lock`): writers take an exclusive lock,
   readers a shared lock, and concurrent access fails fast with
   `Error::VaultBusy` instead of racing on the manifest.
+- `Vault::replace` / `keres replace` updates an existing file entry without a
+  remove-then-add window.
+- `Vault::prune_orphans` / `keres verify --prune` reclaims ciphertext blobs
+  and stale temp files that no manifest record references, refusing to run
+  when the manifest is missing.
 
 ### Changed
 
@@ -33,6 +38,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the non-atomic delete-then-rename fallback.
 - `keres` now lives at `crates/keres`.
 - `keres-cli` now depends on the local library via a path dependency.
+- `unlock` now takes a shared advisory lock, so it cannot read the config in
+  the middle of a concurrent password change.
 - Release profile is defined once at the workspace root.
 - Minimum supported Rust version is now 1.85, matching the current
   dependency graph (`clap`, `rpassword`, `zeroize`, `base64ct`).

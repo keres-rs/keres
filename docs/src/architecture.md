@@ -297,11 +297,13 @@ rewritten wholesale (temp+rename), never mutated in place.
 | `init(pw)` | creates dir mode 0700, config, empty manifest |
 | `unlock` / `lock` | unwraps master into memory / drops it |
 | `add(src, name)` | validates target name, rejects collisions & separators; directories recurse, creating placeholder entries; every blob temp+rename |
+| `replace(src, name)` | rewrites one existing file blob and updates its manifest record; directory entries are rejected |
 | `list()` | reads manifest only — no blobs touched, fast |
 | `extract(name, dest)` | recreates hierarchy; names sanitized; outputs via temp+rename |
 | `remove(name)` | removes subtree: blobs *and* manifest records (no orphans from successful ops) |
 | `change_password(old,new)` | verifies old, re-wraps same master; ciphertext untouched |
 | `verify(pw)` | decrypts every blob (type-checked), cross-checks manifest presence; returns `IntegrityReport{total, verified, missing[], corrupted[]}` |
+| `prune_orphans()` | deletes `.enc` blobs and stale `.tmp-*` files under `d/` that no manifest record references; refuses if the manifest is missing |
 
 Directory removal walks the manifest's own child lists, so removing a
 directory removes everything beneath it even if nested names were added
@@ -328,8 +330,7 @@ Invariants: a crash may lose the *current* operation, never corrupt
   There is no in-place mutation anywhere, which also eliminates torn-header
   states.
 - Failure mid-add leaves unreferenced blobs (manifest unchanged) — visible
-  to nobody, cleaned by future re-adds to the same path; systematic GC is
-  roadmapped (`verify --prune`).
+  to nobody, and reclaimed by `verify --prune` / `Vault::prune_orphans`.
 
 ---
 
