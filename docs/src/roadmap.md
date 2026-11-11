@@ -35,8 +35,12 @@ property will never be accepted for a compatibility or convenience win.
   attested binary archives; remaining work is enabling the crates.io trusted
   publishers and the protected `release` environment.
 
-## Next (0.5.x)
+## Next (0.6.x)
 
+- **v2 → v3 vault migration (0.6.0 blocker)** — 0.5.0 vaults use manifest v2
+  and are rejected by the v3 reader. Add `keres migrate` to stream each blob
+  into a fresh v3 vault with an atomic swap, and make the version error point
+  at it.
 - **Recovery kit** — printable recovery code that wraps the master key
   under a second Argon2id-derived key, stored alongside `vault.config`.
   Mitigates the "one config file bricks everything" failure mode without

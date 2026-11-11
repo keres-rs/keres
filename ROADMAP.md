@@ -21,6 +21,8 @@ matters most for the monorepo.
 
 ## Next
 
+- [ ] `keres migrate`: re-encrypt 0.5.0 (manifest v2) vaults into v3 before
+      the 0.6.0 tag.
 - [x] Decouple entry identity from the mutable path (stable random IDs), so
       `rename` does not require re-encryption.
 - [ ] Public streaming API (`Read`/`Write` adapters), progress, and

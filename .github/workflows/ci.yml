@@ -73,8 +73,11 @@ jobs:
       # packaged until the first `keres` release is on crates.io.
       - name: Check CLI package
         run: |
-          if curl -fsS https://crates.io/api/v1/crates/keres >/dev/null; then
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "keres") | .version')
+          if curl -fsS "https://crates.io/api/v1/crates/keres/$version" >/dev/null; then
             cargo publish --dry-run --locked -p keres-cli
           else
-            echo "keres is not on crates.io yet; skipping keres-cli dry run"
+            echo "keres $version is not on crates.io yet; listing CLI package contents"
+            cargo package --locked -p keres-cli --list
           fi

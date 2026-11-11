@@ -4,18 +4,13 @@ All notable changes to this workspace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-11-10
+## [Unreleased] — 0.6.0
 
 ### Added
 
-- Monorepo workspace containing `keres`, `keres-cli`, and the
-  documentation book.
-- Root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and `CHANGELOG.md`.
-- Workspace-level CI for tests, linting, rustdoc, package dry-runs, and the
-  mdBook build, now with Windows and macOS test jobs.
-- Advisory vault locking (`vault.lock`): writers take an exclusive lock,
-  readers a shared lock, and concurrent access fails fast with
-  `Error::VaultBusy` instead of racing on the manifest.
+- Committed format test vectors with a pinned SHA-256, hidden fuzz entry
+  points, a `cargo-fuzz` workspace with a seeded corpus and weekly workflow,
+  and Criterion throughput benchmarks.
 - `Vault::replace` / `keres replace` updates an existing file entry without a
   remove-then-add window.
 - `Vault::prune_orphans` / `keres verify --prune` reclaims ciphertext blobs
@@ -24,9 +19,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Vault::rename` / `keres rename` renames a top-level file or directory
   without re-encrypting it. Entries now carry a stable 128-bit random ID, and
   blob paths plus container AAD derive from that ID rather than the path.
+- CLI password sources: `--password-file` and `--password-stdin`, with all
+  password buffers zeroized. `--force` and an interactive confirmation guard
+  destructive operations.
 - Tag-driven release workflow: `keres` then `keres-cli` published via
   crates.io Trusted Publishing, cross-platform `keres` binary archives with
   SHA-256 checksums and build-provenance attestations, and a GitHub Release.
+
+### Changed
+
+- The vault manifest schema is now version 3. Each entry records a non-empty
+  random ID; version 2 manifests (and version 3 manifests with a missing ID)
+  are rejected. Blobs are named from the ID, so entry paths are no longer
+  part of the on-disk layout or the AAD.
+- `unlock` now takes a shared advisory lock, so it cannot read the config in
+  the middle of a concurrent password change.
+- CI now runs doctests explicitly and gates advisories, licenses, and sources
+  with `cargo-deny`; Dependabot keeps the workflow actions current.
+- Minimum supported Rust version is now 1.85, matching the current
+  dependency graph (`clap`, `rpassword`, `zeroize`, `base64ct`).
+
+### Upgrade note
+
+- Vaults written by 0.5.0 use manifest v2 and are rejected by 0.6.0.
+  A `keres migrate` command is required before the 0.6.0 tag; until then,
+  extract data with 0.5.0 before upgrading.
+
+## [0.5.0] - 2026-11-10
+
+### Added
+
+- Monorepo workspace containing `keres`, `keres-cli`, and the
+  documentation book.
+- Root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and `CHANGELOG.md`.
+- Workspace-level CI for tests, linting, rustdoc, package dry-runs, and the
+  mdBook build, with Windows and macOS test jobs.
+- Advisory vault locking (`vault.lock`): writers take an exclusive lock,
+  readers a shared lock, and concurrent access fails fast with
+  `Error::VaultBusy` instead of racing on the manifest.
 
 ### Changed
 
@@ -44,15 +74,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the non-atomic delete-then-rename fallback.
 - `keres` now lives at `crates/keres`.
 - `keres-cli` now depends on the local library via a path dependency.
-- `unlock` now takes a shared advisory lock, so it cannot read the config in
-  the middle of a concurrent password change.
-- The vault manifest schema is now version 3. Each entry records a non-empty
-  random ID; version 2 manifests (and version 3 manifests with a missing ID)
-  are rejected. Blobs are named from the ID, so entry paths are no longer
-  part of the on-disk layout or the AAD.
 - Release profile is defined once at the workspace root.
-- Minimum supported Rust version is now 1.85, matching the current
-  dependency graph (`clap`, `rpassword`, `zeroize`, `base64ct`).
 
 ### Security
 

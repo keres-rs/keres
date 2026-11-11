@@ -79,7 +79,7 @@ Measured with the CLI release build (rustc 1.97.1, x86_64, AES-NI),
 - Bulk throughput sits around 5–10 % of raw AES-NI ceiling. Costs: single
   thread, 64 KiB chunks (allocation/GHASH overhead amortization), AAD
   construction per record. Chunks are already independent — a rayon-style
-  parallel pipeline (roadmap 0.5.x) should scale near-linearly toward
+  parallel pipeline (roadmap 0.6.x) should scale near-linearly toward
   GB/s without format changes.
 - Latency-sensitive UIs should batch: unlock once, add many. Per-vault-op
   cost after unlock is essentially AES speed.
