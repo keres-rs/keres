@@ -1,11 +1,10 @@
 //! Encrypted entry blobs inside the vault data directory.
 //!
 //! Each vault entry lives at `d/<h2>/<rest>.enc` where the path is derived
-//! from `SHA256(master_key || full_entry_path)` — identical naming to
-//! previous releases. Blob contents are universal keres containers (see
-//! [`crate::container`]) using HKDF-from-master key derivation, with the
-//! expected payload type (`file` / `directory`) supplied by the manifest
-//! and enforced on every record.
+//! from `SHA256(master_key || entry_id)`. Blob contents are universal keres
+//! containers (see [`crate::container`]) using HKDF-from-master key
+//! derivation, with the expected payload type (`file` / `directory`) supplied
+//! by the manifest and enforced on every record.
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};

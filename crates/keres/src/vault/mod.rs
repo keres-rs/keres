@@ -674,12 +674,7 @@ fn add_directory_tree(
         if ft.is_symlink() {
             continue;
         }
-        let rel = entry
-            .path()
-            .strip_prefix(source_root)
-            .map_err(|_| Error::invalid_name(entry.path().display()))?
-            .to_string_lossy()
-            .to_string();
+        let rel = relative_entry_name(entry.path(), source_root)?;
         if rel.is_empty() {
             continue;
         }
@@ -730,6 +725,26 @@ fn add_directory_tree(
         }
     }
     Ok(())
+}
+
+/// Builds the vault-relative name for an entry below `root`, always using
+/// `/` as the separator.
+///
+/// `Path::to_string_lossy` would use the platform separator, producing
+/// backslashes on Windows; manifest names are `/`-separated everywhere and
+/// [`sanitize::validate_new_name`] rejects `\` as a separator.
+fn relative_entry_name(path: &Path, root: &Path) -> Result<String> {
+    let rel = path
+        .strip_prefix(root)
+        .map_err(|_| Error::invalid_name(path.display()))?;
+    let mut parts = Vec::new();
+    for component in rel.components() {
+        match component {
+            std::path::Component::Normal(part) => parts.push(part.to_string_lossy()),
+            _ => return Err(Error::invalid_name(path.display())),
+        }
+    }
+    Ok(parts.join("/"))
 }
 
 /// Removes an entry subtree: blobs first, index records second.
@@ -802,4 +817,20 @@ fn new_entry_id() -> String {
     let mut bytes = [0u8; 16];
     crypto::fill_random(&mut bytes);
     bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relative_entry_names_use_forward_slashes() {
+        let root = Path::new("root");
+        let nested = root.join("sub").join("file.txt");
+        assert_eq!(
+            relative_entry_name(&nested, root).unwrap(),
+            "sub/file.txt",
+            "manifest names must use '/' on every platform"
+        );
+    }
 }

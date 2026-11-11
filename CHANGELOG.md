@@ -39,6 +39,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Minimum supported Rust version is now 1.85, matching the current
   dependency graph (`clap`, `rpassword`, `zeroize`, `base64ct`).
 
+### Fixed
+
+- Adding a directory tree failed on Windows with `InvalidEntryName` because
+  vault-relative names were built with the platform separator. Manifest names
+  now always use `/`, independent of the host filesystem.
+
 ### Upgrade note
 
 - Vaults written by 0.5.0 use manifest v2 and are rejected by 0.6.0.
