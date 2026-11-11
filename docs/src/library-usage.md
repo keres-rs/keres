@@ -37,6 +37,12 @@ vault.unlock("correct horse battery staple")?;
 vault.add(Path::new("report.pdf"), None)?;
 vault.add(Path::new("photos"), Some("pictures"))?;
 
+// Replace an existing file entry without removing it first.
+vault.replace(Path::new("report-v2.pdf"), "report.pdf")?;
+
+// Rename a top-level entry; ciphertext is not rewritten.
+vault.rename("report.pdf", "report-final.pdf")?;
+
 for entry in vault.list()? {
     println!("{} — {} bytes, dir: {}", entry.name, entry.size, entry.is_directory);
 }
@@ -63,6 +69,15 @@ println!("{} of {} entries authenticated", report.verified, report.total_entries
 
 `verify` authenticates every blob and reports missing or corrupted entries.
 It does not write plaintext to disk.
+
+Interrupted adds can leave ciphertext blobs that no manifest record
+references. `prune_orphans` removes them (and refuses to run if the manifest
+is missing, so it can never mistake a damaged vault for an empty one):
+
+```rust
+let removed = vault.prune_orphans()?;
+println!("removed {removed} orphaned blobs");
+```
 
 ## Building blocks
 

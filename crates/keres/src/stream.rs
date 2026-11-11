@@ -76,10 +76,9 @@ pub(crate) fn write_chunks<W: Write>(
 
     loop {
         buf.resize(CHUNK_SIZE, 0);
-        let n = src.read(&mut buf[..CHUNK_SIZE]).map_err(|e| {
+        let n = src.read(&mut buf[..CHUNK_SIZE]).inspect_err(|_| {
             // Source failed mid-stream; scrub whatever was buffered.
             buf.zeroize();
-            e
         })?;
         buf.truncate(n);
         if n == 0 {

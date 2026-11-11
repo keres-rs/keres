@@ -3,7 +3,7 @@
 The library, CLI, and documentation live in one repository:
 
 ```console
-$ git clone https://github.com/KeresOSS/keres.git
+$ git clone https://github.com/Keres-rs/keres.git
 $ cd keres
 ```
 

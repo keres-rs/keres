@@ -79,7 +79,7 @@ Measured with the CLI release build (rustc 1.97.1, x86_64, AES-NI),
 - Bulk throughput sits around 5–10 % of raw AES-NI ceiling. Costs: single
   thread, 64 KiB chunks (allocation/GHASH overhead amortization), AAD
   construction per record. Chunks are already independent — a rayon-style
-  parallel pipeline (roadmap 0.5.x) should scale near-linearly toward
+  parallel pipeline (roadmap 0.6.x) should scale near-linearly toward
   GB/s without format changes.
 - Latency-sensitive UIs should batch: unlock once, add many. Per-vault-op
   cost after unlock is essentially AES speed.
@@ -98,7 +98,7 @@ Rules that keep the ecosystem stable forever:
    forever.
 3. A released `PayloadType` never changes meaning. New object kinds are
    new types with new AAD contexts.
-4. Schema-bearing payloads (config v2, manifest v2) carry their own inner
+4. Schema-bearing payloads (config v2, manifest v3) carry their own inner
    version integers, checked after authentication.
 5. Only the current format is accepted. Any other magic returns
    `IncompatibleFormat`; extract old data with the release that wrote it,
@@ -151,7 +151,7 @@ Current suite (all green at time of writing):
   directory trees, password rotation and full-tamper sweeps.
 - Gates enforced locally and in CI: `cargo test`, `clippy -D warnings`,
   `fmt --check`, `cargo doc` warning-free, `cargo publish --dry-run`.
-- GitHub Actions: test matrix (stable + MSRV 1.75), lint job, docs job,
+- GitHub Actions: test matrix (stable + MSRV 1.85), lint job, docs job,
   publish-check; the workspace CI also builds the CLI and the docs book.
 
 Notable regression tests born from audits:

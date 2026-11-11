@@ -1,7 +1,8 @@
 use std::io::{self, IsTerminal, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
+use zeroize::Zeroizing;
 
 use keres::prelude::*;
 
@@ -80,6 +81,19 @@ fn existing_vault_path(name: &str) -> Result<PathBuf> {
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    /// Read the password from the first line of this file.
+    #[arg(
+        long,
+        global = true,
+        value_name = "PATH",
+        conflicts_with = "password_stdin"
+    )]
+    password_file: Option<PathBuf>,
+
+    /// Read the password from the first line of standard input.
+    #[arg(long, global = true, conflicts_with = "password_file")]
+    password_stdin: bool,
 }
 
 #[derive(Subcommand)]
@@ -99,12 +113,33 @@ enum Commands {
         #[arg(short, long)]
         name: Option<String>,
     },
+    /// Replace an existing file entry with a new file.
+    Replace {
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
+        vault: String,
+        /// Path to the new file contents.
+        path: PathBuf,
+        /// Name of the existing file entry in the vault.
+        name: String,
+    },
+    /// Rename a top-level file or directory in the vault.
+    Rename {
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
+        vault: String,
+        /// Current name in the vault.
+        from: String,
+        /// New name in the vault.
+        to: String,
+    },
     /// Remove a file or folder from the vault.
     Remove {
         /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
         /// Name of the file/folder in vault.
         name: String,
+        /// Remove without an interactive confirmation.
+        #[arg(short, long)]
+        force: bool,
     },
     /// List vault contents.
     List {
@@ -119,6 +154,9 @@ enum Commands {
         name: String,
         /// Destination path.
         dest: PathBuf,
+        /// Overwrite the destination if it already exists.
+        #[arg(short, long)]
+        force: bool,
     },
     /// Change the vault password.
     ChangePassword {
@@ -129,6 +167,9 @@ enum Commands {
     Verify {
         /// Vault name (stored in `~/.keres/vaults/<name>`).
         vault: String,
+        /// After a successful check, delete blobs that no entry references.
+        #[arg(long)]
+        prune: bool,
     },
     /// Encrypt a single file.
     Encrypt {
@@ -136,6 +177,9 @@ enum Commands {
         input: PathBuf,
         /// Output encrypted file (default: random hashed name).
         output: Option<PathBuf>,
+        /// Overwrite the output if it already exists.
+        #[arg(short, long)]
+        force: bool,
     },
     /// Decrypt a single file.
     Decrypt {
@@ -143,28 +187,104 @@ enum Commands {
         input: PathBuf,
         /// Output decrypted file.
         output: PathBuf,
+        /// Overwrite the output if it already exists.
+        #[arg(short, long)]
+        force: bool,
     },
 }
 
-fn prompt_password(prompt: &str) -> Result<String> {
-    if let Ok(pwd) = std::env::var("KERES_PASSWORD") {
-        return Ok(pwd);
+/// Where the password for this invocation comes from.
+///
+/// Explicit flags win over `KERES_PASSWORD`, which wins over an interactive
+/// prompt. Every value is held in a [`Zeroizing`] buffer so it is scrubbed
+/// when the command finishes.
+struct PasswordSource {
+    file: Option<PathBuf>,
+    stdin: bool,
+}
+
+impl PasswordSource {
+    fn read(&self, prompt: &str) -> Result<Zeroizing<String>> {
+        let password = self.read_inner(prompt)?;
+        if password.is_empty() {
+            return Err(Error::Operation("password must not be empty".into()));
+        }
+        Ok(password)
     }
+
+    fn read_inner(&self, prompt: &str) -> Result<Zeroizing<String>> {
+        if let Some(path) = &self.file {
+            let raw = Zeroizing::new(std::fs::read_to_string(path).map_err(|e| {
+                Error::Operation(format!("cannot read password file {}: {e}", path.display()))
+            })?);
+            return Ok(Zeroizing::new(first_line(&raw).to_string()));
+        }
+        if self.stdin {
+            return read_stdin_line();
+        }
+        if let Ok(password) = std::env::var("KERES_PASSWORD") {
+            return Ok(Zeroizing::new(password));
+        }
+        prompt_interactive(prompt)
+    }
+}
+
+fn first_line(text: &str) -> &str {
+    text.split(['\n', '\r']).next().unwrap_or("")
+}
+
+fn read_stdin_line() -> Result<Zeroizing<String>> {
+    let mut line = Zeroizing::new(String::new());
+    io::stdin()
+        .read_line(&mut line)
+        .map_err(|_| Error::Operation("failed to read password from stdin".into()))?;
+    while line.ends_with('\n') || line.ends_with('\r') {
+        line.pop();
+    }
+    Ok(line)
+}
+
+fn prompt_interactive(prompt: &str) -> Result<Zeroizing<String>> {
     print!("{prompt}: ");
     io::stdout().flush().ok();
     if io::stdin().is_terminal() {
-        rpassword::read_password().map_err(|_| Error::Operation("failed to read password".into()))
+        let password = rpassword::read_password()
+            .map_err(|_| Error::Operation("failed to read password".into()))?;
+        Ok(Zeroizing::new(password))
     } else {
         // No TTY (piped input): read a plain line so scripts and CI can drive us.
-        let mut line = String::new();
-        io::stdin()
-            .read_line(&mut line)
-            .map_err(|_| Error::Operation("failed to read password".into()))?;
-        while line.ends_with('\n') || line.ends_with('\r') {
-            line.pop();
-        }
-        Ok(line)
+        read_stdin_line()
     }
+}
+
+/// Asks for a yes/no answer. Returns an error when there is no terminal to
+/// ask on, so a destructive operation in a script must opt in with `--force`.
+fn confirm(prompt: &str) -> Result<bool> {
+    if !io::stdin().is_terminal() {
+        return Err(Error::Operation(
+            "confirmation requires a terminal; pass --force to proceed".into(),
+        ));
+    }
+    print!("{prompt} [y/N] ");
+    io::stdout().flush().ok();
+    let mut answer = String::new();
+    io::stdin()
+        .read_line(&mut answer)
+        .map_err(|_| Error::Operation("failed to read confirmation".into()))?;
+    Ok(matches!(
+        answer.trim().to_ascii_lowercase().as_str(),
+        "y" | "yes"
+    ))
+}
+
+fn refuse_overwrite(path: &Path, force: bool) -> Result<()> {
+    if !force && path.exists() {
+        return Err(Error::Operation(format!(
+            "{} already exists; pass --force to overwrite",
+            path.display()
+        )));
+    }
+    Ok(())
 }
 
 fn format_size(size: u64) -> String {
@@ -204,45 +324,73 @@ fn print_report(report: &IntegrityReport) {
 
 fn main() {
     let cli = Cli::parse();
-    if let Err(e) = run(cli.command) {
+    let passwords = PasswordSource {
+        file: cli.password_file,
+        stdin: cli.password_stdin,
+    };
+    if let Err(e) = run(cli.command, &passwords) {
         eprintln!("Error: {e}");
         std::process::exit(1);
     }
 }
 
-fn run(command: Commands) -> Result<()> {
+fn run(command: Commands, passwords: &PasswordSource) -> Result<()> {
     match command {
         Commands::Init { vault } => {
             let path = new_vault_path(&vault)?;
-            let password = prompt_password("Enter vault password")?;
-            let confirm = prompt_password("Confirm password")?;
-            if password != confirm {
+            let password = passwords.read("Enter vault password")?;
+            let confirm = passwords.read("Confirm password")?;
+            if password.as_str() != confirm.as_str() {
                 return Err(Error::Operation("passwords don't match".into()));
             }
-            Vault::new(path.clone()).init(&password)?;
+            Vault::new(path.clone()).init(password.as_str())?;
             println!("Vault '{}' created at {}", vault, path.display());
         }
         Commands::Add { vault, path, name } => {
             let dir = existing_vault_path(&vault)?;
-            let password = prompt_password("Enter vault password")?;
+            let password = passwords.read("Enter vault password")?;
             let mut v = Vault::new(dir);
-            v.unlock(&password)?;
+            v.unlock(password.as_str())?;
             v.add(&path, name.as_deref())?;
             println!("Added successfully!");
         }
-        Commands::Remove { vault, name } => {
+        Commands::Replace { vault, path, name } => {
             let dir = existing_vault_path(&vault)?;
-            let password = prompt_password("Enter vault password")?;
+            let password = passwords.read("Enter vault password")?;
             let mut v = Vault::new(dir);
-            v.unlock(&password)?;
+            v.unlock(password.as_str())?;
+            v.replace(&path, &name)?;
+            println!("Replaced successfully!");
+        }
+        Commands::Rename { vault, from, to } => {
+            let dir = existing_vault_path(&vault)?;
+            let password = passwords.read("Enter vault password")?;
+            let mut v = Vault::new(dir);
+            v.unlock(password.as_str())?;
+            v.rename(&from, &to)?;
+            println!("Renamed '{from}' to '{to}'");
+        }
+        Commands::Remove { vault, name, force } => {
+            let dir = existing_vault_path(&vault)?;
+            if !force
+                && !confirm(&format!(
+                    "Remove '{name}' from vault '{vault}'? This cannot be undone."
+                ))?
+            {
+                println!("Aborted.");
+                return Ok(());
+            }
+            let password = passwords.read("Enter vault password")?;
+            let mut v = Vault::new(dir);
+            v.unlock(password.as_str())?;
             v.remove(&name)?;
             println!("Removed successfully!");
         }
         Commands::List { vault } => {
             let dir = existing_vault_path(&vault)?;
-            let password = prompt_password("Enter vault password")?;
+            let password = passwords.read("Enter vault password")?;
             let mut v = Vault::new(dir);
-            v.unlock(&password)?;
+            v.unlock(password.as_str())?;
             let files = v.list()?;
             if files.is_empty() {
                 println!("Vault is empty");
@@ -260,43 +408,72 @@ fn run(command: Commands) -> Result<()> {
                 println!("{:<40} {:>12} {}", e.name, size_str, type_str);
             }
         }
-        Commands::Extract { vault, name, dest } => {
+        Commands::Extract {
+            vault,
+            name,
+            dest,
+            force,
+        } => {
             let dir = existing_vault_path(&vault)?;
-            let password = prompt_password("Enter vault password")?;
+            refuse_overwrite(&dest, force)?;
+            let password = passwords.read("Enter vault password")?;
             let mut v = Vault::new(dir);
-            v.unlock(&password)?;
+            v.unlock(password.as_str())?;
             let out = v.extract(&name, &dest)?;
             println!("Extracted to: {}", out.display());
         }
         Commands::ChangePassword { vault } => {
             let dir = existing_vault_path(&vault)?;
-            let old = prompt_password("Current password")?;
-            let new = prompt_password("New password")?;
-            let confirm = prompt_password("Confirm new password")?;
-            if new != confirm {
+            let old = passwords.read("Current password")?;
+            let new = passwords.read("New password")?;
+            let confirm = passwords.read("Confirm new password")?;
+            if new.as_str() != confirm.as_str() {
                 return Err(Error::Operation("new passwords don't match".into()));
             }
-            Vault::new(dir).change_password(&old, &new)?;
+            if new.as_str() == old.as_str() {
+                return Err(Error::Operation(
+                    "new password must differ from the current password".into(),
+                ));
+            }
+            Vault::new(dir).change_password(old.as_str(), new.as_str())?;
             println!("Password changed successfully!");
         }
-        Commands::Verify { vault } => {
+        Commands::Verify { vault, prune } => {
             let dir = existing_vault_path(&vault)?;
-            let password = prompt_password("Enter vault password")?;
-            let report = Vault::new(dir).verify(&password)?;
+            let password = passwords.read("Enter vault password")?;
+            let mut v = Vault::new(dir);
+            let report = v.verify(password.as_str())?;
             let ok = report.missing.is_empty() && report.corrupted.is_empty();
             print_report(&report);
             if !ok {
                 std::process::exit(1);
             }
+            if prune {
+                v.unlock(password.as_str())?;
+                let removed = v.prune_orphans()?;
+                println!("Pruned {removed} orphaned file(s)");
+            }
         }
-        Commands::Encrypt { input, output } => {
-            let password = prompt_password("Enter encryption password")?;
-            let out_path = keres::encrypt_file(&password, &input, output.as_deref())?;
+        Commands::Encrypt {
+            input,
+            output,
+            force,
+        } => {
+            if let Some(out) = &output {
+                refuse_overwrite(out, force)?;
+            }
+            let password = passwords.read("Enter encryption password")?;
+            let out_path = keres::encrypt_file(password.as_str(), &input, output.as_deref())?;
             println!("Encrypted to: {}", out_path.display());
         }
-        Commands::Decrypt { input, output } => {
-            let password = prompt_password("Enter decryption password")?;
-            let original_name = keres::decrypt_file(&password, &input, &output)?;
+        Commands::Decrypt {
+            input,
+            output,
+            force,
+        } => {
+            refuse_overwrite(&output, force)?;
+            let password = passwords.read("Enter decryption password")?;
+            let original_name = keres::decrypt_file(password.as_str(), &input, &output)?;
             println!("Decrypted '{original_name}' to: {}", output.display());
         }
     }

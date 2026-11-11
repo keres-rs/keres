@@ -195,6 +195,144 @@ fn verify_reports_missing_and_corrupted() {
     assert_eq!(report.verified, 0);
 }
 
+#[test]
+fn replace_updates_file_contents() {
+    let (dir, mut v) = make_vault("replace");
+    let src = dir.path().join("doc.txt");
+    std::fs::write(&src, b"version one").unwrap();
+    v.add(&src, None).unwrap();
+
+    let updated = b"version two, longer";
+    std::fs::write(&src, updated).unwrap();
+    v.replace(&src, "doc.txt").unwrap();
+
+    let out = dir.path().join("out.txt");
+    v.extract("doc.txt", &out).unwrap();
+    assert_eq!(std::fs::read(&out).unwrap(), updated);
+    assert_eq!(v.list().unwrap()[0].size, updated.len() as u64);
+}
+
+#[test]
+fn replace_missing_entry_fails() {
+    let (dir, mut v) = make_vault("replacemissing");
+    let src = dir.path().join("doc.txt");
+    std::fs::write(&src, b"x").unwrap();
+    assert!(matches!(
+        v.replace(&src, "nope.txt"),
+        Err(Error::EntryNotFound(_))
+    ));
+}
+
+#[test]
+fn replace_directory_fails() {
+    let (dir, mut v) = make_vault("replacedir");
+    let tree = dir.path().join("tree");
+    std::fs::create_dir_all(&tree).unwrap();
+    std::fs::write(tree.join("a.txt"), b"a").unwrap();
+    v.add(&tree, None).unwrap();
+
+    let src = dir.path().join("replacement.txt");
+    std::fs::write(&src, b"x").unwrap();
+    assert!(matches!(v.replace(&src, "tree"), Err(Error::Operation(_))));
+}
+
+#[test]
+fn prune_removes_only_unreferenced_files() {
+    let (dir, mut v) = make_vault("prune");
+    let src = dir.path().join("keep.txt");
+    std::fs::write(&src, b"keep me").unwrap();
+    v.add(&src, None).unwrap();
+
+    let data = v.path().join("d");
+    let orphan_dir = data.join("zz");
+    std::fs::create_dir_all(&orphan_dir).unwrap();
+    let orphan = orphan_dir.join("orphan.enc");
+    std::fs::write(&orphan, b"ciphertext-ish").unwrap();
+    let stale_tmp = data.join(".x.tmp-123-deadbeef");
+    std::fs::write(&stale_tmp, b"stale").unwrap();
+    let unrelated = data.join("README");
+    std::fs::write(&unrelated, b"not ours").unwrap();
+
+    let removed = v.prune_orphans().unwrap();
+    assert_eq!(removed, 2);
+    assert!(!orphan.exists());
+    assert!(!stale_tmp.exists());
+    assert!(unrelated.exists(), "prune must not touch unrelated files");
+
+    let out = dir.path().join("out.txt");
+    v.extract("keep.txt", &out).unwrap();
+    assert_eq!(std::fs::read(&out).unwrap(), b"keep me");
+}
+
+#[test]
+fn prune_refuses_without_manifest() {
+    let (_d, mut v) = make_vault("prunenomanifest");
+    std::fs::remove_file(v.path().join("d").join(".manifest.enc")).unwrap();
+    assert!(matches!(v.prune_orphans(), Err(Error::InvalidVault)));
+}
+
+#[test]
+fn rename_preserves_blob_identity() {
+    let (dir, mut v) = make_vault("rename");
+    let src = dir.path().join("old.txt");
+    std::fs::write(&src, b"same bytes").unwrap();
+    v.add(&src, None).unwrap();
+    let before = walk_blobs(&v.path().join("d"));
+    assert_eq!(before.len(), 1);
+
+    v.rename("old.txt", "new.txt").unwrap();
+
+    assert_eq!(
+        walk_blobs(&v.path().join("d")),
+        before,
+        "rename must not move or rewrite the blob"
+    );
+    assert!(matches!(
+        v.extract("old.txt", &dir.path().join("gone")),
+        Err(Error::EntryNotFound(_))
+    ));
+    let out = dir.path().join("out.txt");
+    v.extract("new.txt", &out).unwrap();
+    assert_eq!(std::fs::read(&out).unwrap(), b"same bytes");
+    let names: Vec<_> = v.list().unwrap().into_iter().map(|e| e.name).collect();
+    assert_eq!(names, vec!["new.txt"]);
+}
+
+#[test]
+fn rename_directory_moves_subtree() {
+    let (dir, mut v) = make_vault("renamedir");
+    let tree = dir.path().join("tree");
+    std::fs::create_dir_all(tree.join("sub")).unwrap();
+    std::fs::write(tree.join("sub/file.txt"), b"nested").unwrap();
+    v.add(&tree, None).unwrap();
+
+    v.rename("tree", "archive").unwrap();
+    assert!(matches!(
+        v.extract("tree", &dir.path().join("gone")),
+        Err(Error::EntryNotFound(_))
+    ));
+
+    let out = dir.path().join("restored");
+    v.extract("archive", &out).unwrap();
+    assert_eq!(std::fs::read(out.join("sub/file.txt")).unwrap(), b"nested");
+}
+
+#[test]
+fn rename_to_existing_name_fails() {
+    let (dir, mut v) = make_vault("renamecollision");
+    let a = dir.path().join("a.txt");
+    let b = dir.path().join("b.txt");
+    std::fs::write(&a, b"a").unwrap();
+    std::fs::write(&b, b"b").unwrap();
+    v.add(&a, None).unwrap();
+    v.add(&b, None).unwrap();
+
+    assert!(matches!(
+        v.rename("a.txt", "b.txt"),
+        Err(Error::EntryExists(_))
+    ));
+}
+
 fn walk_blobs(dir: &Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
     for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {

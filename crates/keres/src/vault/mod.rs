@@ -30,7 +30,7 @@ use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use crate::crypto::Key;
+use crate::crypto::{self, Key};
 use crate::error::{Error, Result};
 use crate::sanitize;
 
@@ -194,6 +194,15 @@ impl Vault {
         if !self.exists() {
             return Err(Error::VaultNotFound);
         }
+        // A shared lock keeps `unlock` from reading the config in the middle
+        // of a concurrent `change_password` (which holds the exclusive lock).
+        let _lock = VaultLock::shared(&self.path)?;
+        self.unlock_inner(password)
+    }
+
+    /// Unlocks without acquiring the advisory lock. Callers that already hold
+    /// a vault lock must use this to avoid a self-conflict.
+    fn unlock_inner(&mut self, password: &str) -> Result<()> {
         let config = self.load_config()?;
         self.keystore.unlock(password, &config)
     }
@@ -258,17 +267,140 @@ impl Vault {
         if source.is_dir() {
             add_directory_tree(&self.path, &master, &source, &root_name, &mut all)?;
         } else {
+            let id = new_entry_id();
             let meta = EntryMetadata {
+                id: id.clone(),
                 original_name: root_name.clone(),
                 original_size: fs::metadata(&source)?.len(),
                 is_directory: false,
                 children: None,
             };
-            blobs::write_entry(&self.path, &master, &root_name, &meta, Some(&source))?;
+            blobs::write_entry(&self.path, &master, &id, &meta, Some(&source))?;
             all.insert(root_name.clone(), meta);
         }
 
         // Phase 2: commit index atomically.
+        manifest::save(&self.path, &all, &master)?;
+        Ok(())
+    }
+
+    /// Replaces the contents of an existing file entry.
+    ///
+    /// `source` must be a regular file and `name` must refer to a file entry
+    /// (remove a directory tree first). The new blob is written before the
+    /// manifest is committed, matching [`Vault::add`]: a crash can leave
+    /// stale size metadata, but never a dangling index.
+    ///
+    /// ```no_run
+    /// let mut vault = keres::Vault::new("secrets".into());
+    /// vault.unlock("correct horse")?;
+    /// vault.replace(std::path::Path::new("notes.txt"), "notes.txt")?;
+    /// # Ok::<(), keres::Error>(())
+    /// ```
+    pub fn replace(&mut self, source: &Path, name: &str) -> Result<()> {
+        let master = self.require_unlocked()?;
+        let _lock = VaultLock::exclusive(&self.path)?;
+        sanitize::validate_new_name(name)?;
+
+        let source = source
+            .canonicalize()
+            .map_err(|_| Error::invalid_name(source.display()))?;
+        if !source.is_file() {
+            return Err(Error::invalid_name(source.display()));
+        }
+
+        let mut all = manifest::load(&self.path, &master)?;
+        let existing = all
+            .get(name)
+            .ok_or_else(|| Error::EntryNotFound(preview(name)))?;
+        if existing.is_directory {
+            return Err(Error::Operation(
+                "cannot replace a directory entry; remove it first".into(),
+            ));
+        }
+        let id = existing.id.clone();
+
+        let meta = EntryMetadata {
+            id: id.clone(),
+            original_name: name.to_string(),
+            original_size: fs::metadata(&source)?.len(),
+            is_directory: false,
+            children: None,
+        };
+        blobs::write_entry(&self.path, &master, &id, &meta, Some(&source))?;
+        all.insert(name.to_string(), meta);
+        manifest::save(&self.path, &all, &master)?;
+        Ok(())
+    }
+
+    /// Renames a top-level file or directory entry without re-encrypting it.
+    ///
+    /// Because blob locations and container AAD are derived from the entry's
+    /// stable random ID, a rename only rewrites the (encrypted) manifest.
+    /// Directory renames rewrite the child paths inside the subtree as well.
+    ///
+    /// ```no_run
+    /// let mut vault = keres::Vault::new("secrets".into());
+    /// vault.unlock("correct horse")?;
+    /// vault.rename("notes.txt", "journal.txt")?;
+    /// # Ok::<(), keres::Error>(())
+    /// ```
+    pub fn rename(&mut self, from: &str, to: &str) -> Result<()> {
+        let master = self.require_unlocked()?;
+        let _lock = VaultLock::exclusive(&self.path)?;
+        sanitize::validate_new_name(from)?;
+        sanitize::validate_new_name(to)?;
+        if from == to {
+            return Ok(());
+        }
+
+        let mut all = manifest::load(&self.path, &master)?;
+        let original = all
+            .get(from)
+            .cloned()
+            .ok_or_else(|| Error::EntryNotFound(preview(from)))?;
+        if all.contains_key(to) {
+            return Err(Error::EntryExists(to.to_string()));
+        }
+
+        let old_prefix = format!("{from}/");
+        let new_prefix = format!("{to}/");
+        let mut moves = Vec::new();
+        if original.is_directory {
+            for (path, meta) in all.range(old_prefix.clone()..) {
+                if !path.starts_with(&old_prefix) {
+                    break;
+                }
+                moves.push((path.clone(), meta.clone()));
+            }
+        }
+        moves.push((from.to_string(), original));
+
+        // Remove every old key first so inserting new ones cannot collide with
+        // a stale subtree entry.
+        for (path, _) in &moves {
+            all.remove(path);
+        }
+
+        for (path, mut meta) in moves {
+            let new_path = if path == from {
+                to.to_string()
+            } else {
+                format!("{new_prefix}{}", &path[old_prefix.len()..])
+            };
+            meta.original_name = new_path.clone();
+            if let Some(children) = meta.children.as_mut() {
+                for child in children.iter_mut() {
+                    if let Some(suffix) = child.strip_prefix(&old_prefix) {
+                        *child = format!("{new_prefix}{suffix}");
+                    } else if child == from {
+                        *child = to.to_string();
+                    }
+                }
+            }
+            all.insert(new_path, meta);
+        }
+
         manifest::save(&self.path, &all, &master)?;
         Ok(())
     }
@@ -334,7 +466,7 @@ impl Vault {
             .clone();
 
         if !meta.is_directory {
-            stream_blob_to_file(&self.path, &master, name, dest, false)?;
+            stream_blob_to_file(&self.path, &master, &meta.id, dest, false)?;
             return Ok(dest.to_path_buf());
         }
 
@@ -352,7 +484,7 @@ impl Vault {
             if child_meta.is_directory {
                 crate::fsutil::create_private_dir(&target)?;
             } else {
-                stream_blob_to_file(&self.path, &master, child_path, &target, false)?;
+                stream_blob_to_file(&self.path, &master, &child_meta.id, &target, false)?;
             }
         }
         Ok(dest.to_path_buf())
@@ -379,7 +511,7 @@ impl Vault {
         config.unwrap_master_key(old_password)?;
 
         if !self.keystore.is_unlocked() {
-            self.unlock(old_password)?;
+            self.unlock_inner(old_password)?;
         }
 
         let new_config = self.keystore.rotate_password(new_password)?;
@@ -410,7 +542,7 @@ impl Vault {
         let _lock = VaultLock::shared(&self.path)?;
         let was_unlocked = self.is_unlocked();
         if !was_unlocked {
-            self.unlock(password)?;
+            self.unlock_inner(password)?;
         }
         let result = self.verify_unlocked();
         if !was_unlocked {
@@ -429,7 +561,7 @@ impl Vault {
         };
 
         for (name, meta) in all.iter() {
-            match blobs::read_entry(&self.path, &master, name, meta.is_directory, |_| Ok(())) {
+            match blobs::read_entry(&self.path, &master, &meta.id, meta.is_directory, |_| Ok(())) {
                 Ok(_) => report.verified += 1,
                 Err(Error::Io(ref e)) if e.kind() == std::io::ErrorKind::NotFound => {
                     report.missing.push(name.clone());
@@ -439,6 +571,63 @@ impl Vault {
         }
 
         Ok(report)
+    }
+
+    /// Deletes blobs that no manifest record references.
+    ///
+    /// Failed or interrupted adds can leave ciphertext behind that the
+    /// manifest never mentions. They are harmless but waste space. Pruning
+    /// requires an unlocked vault and takes the exclusive lock. Only files
+    /// ending in `.enc` (other than `.manifest.enc`) and leftover `.tmp-*`
+    /// files under `d/` are candidates, so unrelated files are never touched.
+    ///
+    /// Refuses to run when the manifest is missing: treating that as an empty
+    /// index would delete every blob.
+    pub fn prune_orphans(&mut self) -> Result<usize> {
+        let master = self.require_unlocked()?;
+        let _lock = VaultLock::exclusive(&self.path)?;
+
+        let data_dir = self.path.join("d");
+        let manifest_file = data_dir.join(".manifest.enc");
+        if !manifest_file.is_file() {
+            return Err(Error::InvalidVault);
+        }
+
+        let all = manifest::load(&self.path, &master)?;
+        let referenced: std::collections::HashSet<PathBuf> = all
+            .values()
+            .map(|meta| blobs::blob_path(&self.path, &master, &meta.id))
+            .collect();
+
+        let mut removed = 0usize;
+        for entry in walkdir::WalkDir::new(&data_dir).min_depth(1) {
+            let entry = entry.map_err(|_| Error::InvalidVault)?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if path == manifest_file.as_path() || referenced.contains(path) {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy();
+            if !name.ends_with(".enc") && !name.contains(".tmp-") {
+                continue;
+            }
+            fs::remove_file(path)?;
+            removed += 1;
+        }
+
+        // Drop shard directories that pruning emptied. Best-effort: a
+        // non-empty directory is simply left in place.
+        if let Ok(shards) = fs::read_dir(&data_dir) {
+            for shard in shards.flatten() {
+                if shard.path().is_dir() {
+                    let _ = fs::remove_dir(shard.path());
+                }
+            }
+        }
+
+        Ok(removed)
     }
 }
 
@@ -463,6 +652,7 @@ fn add_directory_tree(
     all.insert(
         vault_name.to_string(),
         EntryMetadata {
+            id: new_entry_id(),
             original_name: vault_name.to_string(),
             original_size: 0,
             is_directory: true,
@@ -484,12 +674,7 @@ fn add_directory_tree(
         if ft.is_symlink() {
             continue;
         }
-        let rel = entry
-            .path()
-            .strip_prefix(source_root)
-            .map_err(|_| Error::invalid_name(entry.path().display()))?
-            .to_string_lossy()
-            .to_string();
+        let rel = relative_entry_name(entry.path(), source_root)?;
         if rel.is_empty() {
             continue;
         }
@@ -505,6 +690,7 @@ fn add_directory_tree(
             all.insert(
                 full.clone(),
                 EntryMetadata {
+                    id: new_entry_id(),
                     original_name: full.clone(),
                     original_size: 0,
                     is_directory: true,
@@ -513,13 +699,15 @@ fn add_directory_tree(
             );
             dir_paths.push(full.clone());
         } else if ft.is_file() {
+            let id = new_entry_id();
             let meta = EntryMetadata {
+                id: id.clone(),
                 original_name: full.clone(),
                 original_size: entry.metadata().map(|m| m.len()).unwrap_or(0),
                 is_directory: false,
                 children: None,
             };
-            blobs::write_entry(vault_dir, master, &full, &meta, Some(entry.path()))?;
+            blobs::write_entry(vault_dir, master, &id, &meta, Some(entry.path()))?;
             all.insert(full.clone(), meta);
         }
 
@@ -533,10 +721,30 @@ fn add_directory_tree(
     // Persist directory placeholder blobs (only the ones from this call).
     for dir_path in &dir_paths {
         if let Some(meta) = all.get(dir_path) {
-            blobs::write_entry(vault_dir, master, dir_path, meta, None)?;
+            blobs::write_entry(vault_dir, master, &meta.id, meta, None)?;
         }
     }
     Ok(())
+}
+
+/// Builds the vault-relative name for an entry below `root`, always using
+/// `/` as the separator.
+///
+/// `Path::to_string_lossy` would use the platform separator, producing
+/// backslashes on Windows; manifest names are `/`-separated everywhere and
+/// [`sanitize::validate_new_name`] rejects `\` as a separator.
+fn relative_entry_name(path: &Path, root: &Path) -> Result<String> {
+    let rel = path
+        .strip_prefix(root)
+        .map_err(|_| Error::invalid_name(path.display()))?;
+    let mut parts = Vec::new();
+    for component in rel.components() {
+        match component {
+            std::path::Component::Normal(part) => parts.push(part.to_string_lossy()),
+            _ => return Err(Error::invalid_name(path.display())),
+        }
+    }
+    Ok(parts.join("/"))
 }
 
 /// Removes an entry subtree: blobs first, index records second.
@@ -552,7 +760,9 @@ fn remove_subtree(vault_dir: &Path, master: &Key, name: &str, all: &mut Manifest
         doomed.push(cur);
     }
     for cur in doomed {
-        let _ = blobs::remove_blob(vault_dir, master, &cur);
+        if let Some(meta) = all.get(&cur) {
+            let _ = blobs::remove_blob(vault_dir, master, &meta.id);
+        }
         all.remove(&cur);
     }
 }
@@ -567,7 +777,7 @@ fn join_sanitized(base: &Path, rel: &str) -> Result<PathBuf> {
 fn stream_blob_to_file(
     vault_dir: &Path,
     master: &Key,
-    entry_path: &str,
+    entry_id: &str,
     target: &Path,
     is_directory: bool,
 ) -> Result<()> {
@@ -577,7 +787,7 @@ fn stream_blob_to_file(
         {
             let f = crate::fsutil::create_private_file(&tmp)?;
             let mut w = std::io::BufWriter::new(f);
-            blobs::read_entry(vault_dir, master, entry_path, is_directory, |chunk| {
+            blobs::read_entry(vault_dir, master, entry_id, is_directory, |chunk| {
                 w.write_all(chunk)?;
                 Ok(())
             })?;
@@ -600,4 +810,27 @@ fn stream_blob_to_file(
 
 fn preview(name: &str) -> String {
     name.chars().take(64).collect()
+}
+
+/// Generates a 128-bit random entry identifier, hex-encoded.
+fn new_entry_id() -> String {
+    let mut bytes = [0u8; 16];
+    crypto::fill_random(&mut bytes);
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relative_entry_names_use_forward_slashes() {
+        let root = Path::new("root");
+        let nested = root.join("sub").join("file.txt");
+        assert_eq!(
+            relative_entry_name(&nested, root).unwrap(),
+            "sub/file.txt",
+            "manifest names must use '/' on every platform"
+        );
+    }
 }

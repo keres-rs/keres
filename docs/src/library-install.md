@@ -22,7 +22,7 @@ keres = "0.4"
 
 ## Requirements
 
-- Rust 1.75 or newer (MSRV).
+- Rust 1.85 or newer (MSRV).
 - No async runtime, no external services, and no I/O beyond `std::fs`.
 
 ## From the workspace

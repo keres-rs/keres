@@ -1,11 +1,12 @@
 [workspace]
 members = ["crates/keres", "crates/keres-cli"]
+exclude = ["fuzz"]
 resolver = "2"
 
 [workspace.package]
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.85"
 authors = ["Yash Sharma"]
 license = "Apache-2.0"
 repository = "https://github.com/Keres-rs/keres"
@@ -13,6 +14,7 @@ repository = "https://github.com/Keres-rs/keres"
 [workspace.dependencies]
 clap = { version = "4.5", features = ["derive"] }
 rpassword = "7"
+zeroize = "1.7"
 
 [profile.release]
 lto = true

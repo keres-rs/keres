@@ -41,7 +41,7 @@
           cargoLock.lockFile = ./Cargo.lock;
           meta = with pkgs.lib; {
             description = "Encrypted files, vaults, and CLI";
-            homepage = "https://github.com/KeresOSS/keres";
+            homepage = "https://github.com/Keres-rs/keres";
             license = licenses.apache2;
             mainProgram = "keres";
             platforms = platforms.unix;

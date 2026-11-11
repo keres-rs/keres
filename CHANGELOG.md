@@ -4,6 +4,53 @@ All notable changes to this workspace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 0.6.0
+
+### Added
+
+- Committed format test vectors with a pinned SHA-256, hidden fuzz entry
+  points, a `cargo-fuzz` workspace with a seeded corpus and weekly workflow,
+  and Criterion throughput benchmarks.
+- `Vault::replace` / `keres replace` updates an existing file entry without a
+  remove-then-add window.
+- `Vault::prune_orphans` / `keres verify --prune` reclaims ciphertext blobs
+  and stale temp files that no manifest record references, refusing to run
+  when the manifest is missing.
+- `Vault::rename` / `keres rename` renames a top-level file or directory
+  without re-encrypting it. Entries now carry a stable 128-bit random ID, and
+  blob paths plus container AAD derive from that ID rather than the path.
+- CLI password sources: `--password-file` and `--password-stdin`, with all
+  password buffers zeroized. `--force` and an interactive confirmation guard
+  destructive operations.
+- Tag-driven release workflow: `keres` then `keres-cli` published via
+  crates.io Trusted Publishing, cross-platform `keres` binary archives with
+  SHA-256 checksums and build-provenance attestations, and a GitHub Release.
+
+### Changed
+
+- The vault manifest schema is now version 3. Each entry records a non-empty
+  random ID; version 2 manifests (and version 3 manifests with a missing ID)
+  are rejected. Blobs are named from the ID, so entry paths are no longer
+  part of the on-disk layout or the AAD.
+- `unlock` now takes a shared advisory lock, so it cannot read the config in
+  the middle of a concurrent password change.
+- CI now runs doctests explicitly and gates advisories, licenses, and sources
+  with `cargo-deny`; Dependabot keeps the workflow actions current.
+- Minimum supported Rust version is now 1.85, matching the current
+  dependency graph (`clap`, `rpassword`, `zeroize`, `base64ct`).
+
+### Fixed
+
+- Adding a directory tree failed on Windows with `InvalidEntryName` because
+  vault-relative names were built with the platform separator. Manifest names
+  now always use `/`, independent of the host filesystem.
+
+### Upgrade note
+
+- Vaults written by 0.5.0 use manifest v2 and are rejected by 0.6.0.
+  A `keres migrate` command is required before the 0.6.0 tag; until then,
+  extract data with 0.5.0 before upgrading.
+
 ## [0.5.0] - 2026-11-10
 
 ### Added
@@ -12,7 +59,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   documentation book.
 - Root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and `CHANGELOG.md`.
 - Workspace-level CI for tests, linting, rustdoc, package dry-runs, and the
-  mdBook build, now with Windows and macOS test jobs.
+  mdBook build, with Windows and macOS test jobs.
 - Advisory vault locking (`vault.lock`): writers take an exclusive lock,
   readers a shared lock, and concurrent access fails fast with
   `Error::VaultBusy` instead of racing on the manifest.
@@ -76,8 +123,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Pre-0.4 formats are retired; old files are rejected.
 
-[Unreleased]: https://github.com/KeresOSS/keres/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/KeresOSS/keres/compare/v0.4.2...v0.5.0
-[0.4.2]: https://github.com/KeresOSS/keres/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/KeresOSS/keres/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/KeresOSS/keres/releases/tag/v0.4.0
+[Unreleased]: https://github.com/Keres-rs/keres/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Keres-rs/keres/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/Keres-rs/keres/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/Keres-rs/keres/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/Keres-rs/keres/releases/tag/v0.4.0

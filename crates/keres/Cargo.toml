@@ -30,8 +30,14 @@ zeroize = { version = "1.7", features = ["derive"] }
 walkdir = "2.5"
 
 [dev-dependencies]
+criterion = "0.5"
 fs4 = { version = "1.1", default-features = false, features = ["sync"] }
+sha2 = "0.10"
 tempfile = "3.12"
+
+[[bench]]
+name = "throughput"
+harness = false
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -95,6 +95,9 @@ pub mod crypto;
 /// Error types.
 pub mod error;
 mod fsutil;
+/// Hidden entrance points for the fuzz targets in `fuzz/`.
+#[doc(hidden)]
+pub mod fuzz_support;
 /// Argon2id parameter types.
 pub mod kdf;
 /// Entry-name validation helpers.
@@ -103,6 +106,9 @@ pub mod sanitize;
 mod single_file;
 /// Chunked streaming encryption engine.
 mod stream;
+/// Deterministic containers that pin the wire format.
+#[doc(hidden)]
+pub mod test_vectors;
 /// Multi-file encrypted vaults.
 pub mod vault;
 

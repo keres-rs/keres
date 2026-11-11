@@ -61,7 +61,7 @@ $ keres remove personal notes.txt
 
 Passwords are read from a terminal prompt, or from the `KERES_PASSWORD`
 environment variable for scripts and CI. The library's threat model still
-applies: see [SECURITY.md](https://github.com/KeresOSS/keres/blob/main/SECURITY.md).
+applies: see [SECURITY.md](https://github.com/Keres-rs/keres/blob/main/SECURITY.md).
 
 ## Development
 
@@ -72,4 +72,4 @@ $ cargo test --workspace
 
 ## License
 
-Apache-2.0. See [LICENSE](https://github.com/KeresOSS/keres/blob/main/LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/Keres-rs/keres/blob/main/LICENSE).

@@ -9,6 +9,11 @@ property will never be accepted for a compatibility or convenience win.
 - **Fuzzing targets** — `cargo-fuzz` harnesses for `read_container`,
   `read_entry`, manifest/config parsing and name sanitization. The parser
   surface is small; it should be provably robust against hostile input.
+  *(Done: `fuzz/` covers the container, manifest, config, and sanitizer
+  parsers, with a seeded corpus and a weekly workflow.)*
+- **Published test vectors and benchmarks** — a committed deterministic
+  `.krs` fixture with a pinned SHA-256, plus Criterion throughput benches.
+  *(Done.)*
 - **Memory locking** — evaluate `memsec`/`region` behind a tiny `unsafe`
   boundary (feature-gated) so master keys can be `mlock`ed and core dumps
   suppressed. Requires relaxing `forbid(unsafe_code)` to
@@ -17,15 +22,25 @@ property will never be accepted for a compatibility or convenience win.
   increasing generation counter in the vault config and sign each manifest
   save with it, so restoring an old snapshot of the vault directory is at
   least *detectable* on next unlock.
+- **Stable entry identity** — blobs and container AAD are keyed by a random
+  128-bit entry ID stored in the manifest, not by the mutable path, so
+  `rename` rewrites only the manifest. *(Done. Manifest v3; `Vault::rename` /
+  `keres rename`. Manifest scaling and rollback protection remain.)*
 - **Concurrent-access safety** — non-blocking advisory locks around every
   vault read and write, so a second process fails fast with `VaultBusy`
   instead of clobbering the manifest. *(Done.)*
-- **CI hardening** — Windows and macOS test jobs are in place; remaining
-  work is `cargo-audit` / `cargo-deny` supply-chain checks and signed
-  release artifacts.
+- **CI hardening** — Windows and macOS test jobs are in place, and
+  `cargo-deny` gates advisories, licenses, and sources. A tag-driven
+  `release.yml` now publishes both crates via Trusted Publishing and attaches
+  attested binary archives; remaining work is enabling the crates.io trusted
+  publishers and the protected `release` environment.
 
-## Next (0.5.x)
+## Next (0.6.x)
 
+- **v2 → v3 vault migration (0.6.0 blocker)** — 0.5.0 vaults use manifest v2
+  and are rejected by the v3 reader. Add `keres migrate` to stream each blob
+  into a fresh v3 vault with an atomic swap, and make the version error point
+  at it.
 - **Recovery kit** — printable recovery code that wraps the master key
   under a second Argon2id-derived key, stored alongside `vault.config`.
   Mitigates the "one config file bricks everything" failure mode without
@@ -42,8 +57,9 @@ property will never be accepted for a compatibility or convenience win.
 - **Streaming public API** — `Read`/`Write` adapter types so library users
   can pipe containers without buffering whole objects.
 - **Orphan garbage collection** — after failed adds/removals, blobs may
-  exist that no manifest record references. Add a `verify --prune` /
-  compaction routine that walks `d/` and deletes unreferenced blobs.
+  exist that no manifest record references. `verify --prune` /
+  `Vault::prune_orphans` walks `d/` and deletes unreferenced blobs and stale
+  temp files. *(Done.)*
 - **Dependency slimming: drop `walkdir`** — its single production use is
   the directory traversal in `add_directory_tree` (`crates/keres/src/vault/mod.rs`).
   Replace with a ~40-line `std::fs::read_dir` walker preserving exact

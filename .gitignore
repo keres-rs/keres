@@ -1,6 +1,7 @@
 target/
 result/
 *.krs
+!crates/keres/tests/vectors/*.krs
 docs/book/
 .direnv/
 .DS_Store

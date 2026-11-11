@@ -6,7 +6,7 @@ the library, the CLI, and the documentation.
 ## Getting started
 
 ```console
-$ git clone https://github.com/KeresOSS/keres.git
+$ git clone https://github.com/Keres-rs/keres.git
 $ cd keres
 $ cargo test --workspace --all-targets
 ```
@@ -25,6 +25,8 @@ $ nix develop            # if you use Nix; includes mdbook
 - `crates/keres-cli/` — the `keres` binary. Keep it a thin wrapper over
   the library; business logic belongs in `keres`.
 - `docs/` — the mdBook sources. Build locally with `mdbook serve docs`.
+- `.github/workflows/` — CI, docs deployment, fuzzing, and the tag-driven
+  release pipeline.
 
 ## Before opening a pull request
 
@@ -34,6 +36,8 @@ Run the same gates as CI:
 $ cargo fmt --all -- --check
 $ cargo clippy --workspace --all-targets -- -D warnings
 $ cargo test --workspace --all-targets
+$ cargo test --workspace --doc
+$ cargo deny check
 $ cargo doc --workspace --no-deps
 $ mdbook build docs
 ```
@@ -49,6 +53,13 @@ $ mdbook build docs
 - Keep the container format backwards-compatible. New object kinds are new
   payload types, never new magics.
 - Prefer small, focused commits with a clear rationale.
+
+## Releases
+
+Releases are tag-driven; see [docs/src/release.md](docs/src/release.md). A tag
+must point at a commit on `main` and match the workspace version. Publishing
+uses crates.io Trusted Publishing behind the protected `release` environment,
+so maintainers do not need a long-lived registry token.
 
 ## Reporting bugs and vulnerabilities
 

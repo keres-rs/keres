@@ -1,11 +1,10 @@
 //! Encrypted entry blobs inside the vault data directory.
 //!
 //! Each vault entry lives at `d/<h2>/<rest>.enc` where the path is derived
-//! from `SHA256(master_key || full_entry_path)` — identical naming to
-//! previous releases. Blob contents are universal keres containers (see
-//! [`crate::container`]) using HKDF-from-master key derivation, with the
-//! expected payload type (`file` / `directory`) supplied by the manifest
-//! and enforced on every record.
+//! from `SHA256(master_key || entry_id)`. Blob contents are universal keres
+//! containers (see [`crate::container`]) using HKDF-from-master key
+//! derivation, with the expected payload type (`file` / `directory`) supplied
+//! by the manifest and enforced on every record.
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -20,12 +19,13 @@ use crate::vault::manifest::EntryMetadata;
 
 /// Deterministic storage location for an entry's ciphertext.
 ///
-/// The hash binds the master key so paths are stable within a vault and
-/// opaque outside it.
-fn blob_path(vault_dir: &Path, master: &Key, entry_path: &str) -> PathBuf {
+/// The hash binds the master key and the entry's stable random ID (not its
+/// path), so renaming an entry never requires re-encrypting its blob and the
+/// location stays opaque outside the vault.
+pub(crate) fn blob_path(vault_dir: &Path, master: &Key, entry_id: &str) -> PathBuf {
     let mut hasher = Sha256::new();
     hasher.update(master.expose());
-    hasher.update(entry_path.as_bytes());
+    hasher.update(entry_id.as_bytes());
     let h = format!("{:x}", hasher.finalize());
     vault_dir
         .join("d")
@@ -41,11 +41,11 @@ fn blob_path(vault_dir: &Path, master: &Key, entry_path: &str) -> PathBuf {
 pub(crate) fn write_entry(
     vault_dir: &Path,
     master: &Key,
-    entry_path: &str,
+    entry_id: &str,
     meta: &EntryMetadata,
     source: Option<&Path>,
 ) -> Result<PathBuf> {
-    let target = blob_path(vault_dir, master, entry_path);
+    let target = blob_path(vault_dir, master, entry_id);
     if let Some(parent) = target.parent() {
         crate::fsutil::create_private_dir(parent)?;
     }
@@ -78,7 +78,7 @@ pub(crate) fn write_entry(
                 None,
                 Some(master),
                 typ,
-                entry_path.as_bytes(),
+                entry_id.as_bytes(),
                 src,
                 None,
             )?;
@@ -109,11 +109,11 @@ pub(crate) fn write_entry(
 pub(crate) fn read_entry(
     vault_dir: &Path,
     master: &Key,
-    entry_path: &str,
+    entry_id: &str,
     is_directory: bool,
     mut sink: impl FnMut(&[u8]) -> Result<()>,
 ) -> Result<EntryMetadata> {
-    let path = blob_path(vault_dir, master, entry_path);
+    let path = blob_path(vault_dir, master, entry_id);
     let expected = if is_directory {
         PayloadType::Directory
     } else {
@@ -126,11 +126,12 @@ pub(crate) fn read_entry(
         None,
         Some(master),
         expected,
-        entry_path.as_bytes(),
+        entry_id.as_bytes(),
         |chunk| sink(chunk),
     )?;
 
     Ok(EntryMetadata {
+        id: entry_id.to_string(),
         original_name: String::new(),
         original_size: trailer.size,
         is_directory: trailer.typ == PayloadType::Directory,
@@ -140,8 +141,8 @@ pub(crate) fn read_entry(
 
 /// Removes the blob backing an entry, if present. Best-effort removal of
 /// the now-empty shard directory keeps the data directory tidy.
-pub(crate) fn remove_blob(vault_dir: &Path, master: &Key, entry_path: &str) -> Result<()> {
-    let path = blob_path(vault_dir, master, entry_path);
+pub(crate) fn remove_blob(vault_dir: &Path, master: &Key, entry_id: &str) -> Result<()> {
+    let path = blob_path(vault_dir, master, entry_id);
     crate::fsutil::remove_file_if_exists(&path)?;
     if let Some(parent) = path.parent() {
         // Only succeeds when empty; races with concurrent adds are benign.
