@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities privately to the maintainers through
-GitHub's [private vulnerability reporting](https://github.com/KeresOSS/keres/security/advisories/new)
+GitHub's [private vulnerability reporting](https://github.com/Keres-rs/keres/security/advisories/new)
 or by opening a draft security advisory. Do not open a public issue for a
 vulnerability. Include:
 

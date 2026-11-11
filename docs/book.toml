@@ -5,5 +5,5 @@ language = "en"
 src = "src"
 
 [output.html]
-git-repository-url = "https://github.com/KeresOSS/keres"
-edit-url-template = "https://github.com/KeresOSS/keres/edit/main/docs/{path}"
+git-repository-url = "https://github.com/Keres-rs/keres"
+edit-url-template = "https://github.com/Keres-rs/keres/edit/main/docs/{path}"

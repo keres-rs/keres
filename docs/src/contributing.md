@@ -6,7 +6,7 @@ workspace containing the library, CLI, and documentation.
 ## Getting started
 
 ```console
-$ git clone https://github.com/KeresOSS/keres.git
+$ git clone https://github.com/Keres-rs/keres.git
 $ cd keres
 $ cargo test --workspace --all-targets
 ```
@@ -69,7 +69,7 @@ review.
 - Bugs and feature requests: open a GitHub issue with a minimal reproducer,
   OS, Rust version, and the command or API call used.
 - Security issues: do **not** open a public issue. See
-  [SECURITY.md](https://github.com/KeresOSS/keres/blob/main/SECURITY.md).
+  [SECURITY.md](https://github.com/Keres-rs/keres/blob/main/SECURITY.md).
 
 ## License
 

@@ -30,8 +30,10 @@ property will never be accepted for a compatibility or convenience win.
   vault read and write, so a second process fails fast with `VaultBusy`
   instead of clobbering the manifest. *(Done.)*
 - **CI hardening** — Windows and macOS test jobs are in place, and
-  `cargo-deny` gates advisories, licenses, and sources. Remaining work is
-  signed release artifacts.
+  `cargo-deny` gates advisories, licenses, and sources. A tag-driven
+  `release.yml` now publishes both crates via Trusted Publishing and attaches
+  attested binary archives; remaining work is enabling the crates.io trusted
+  publishers and the protected `release` environment.
 
 ## Next (0.5.x)
 

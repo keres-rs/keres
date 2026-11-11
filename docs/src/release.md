@@ -1,5 +1,38 @@
 # Release Notes
 
+## Releasing
+
+Releases are tag-driven. `.github/workflows/release.yml` runs when a `v*` tag
+is pushed (or manually via **Run workflow**) and:
+
+1. Verifies the tag is on `main` and matches the workspace version in
+   `Cargo.toml`.
+2. Runs `cargo test --workspace --locked`.
+3. Publishes `keres` and then `keres-cli` to crates.io, waiting for the index
+   to expose the library before the CLI.
+4. Builds `keres` for Linux (x86_64), macOS (aarch64), and Windows (x86_64),
+   packages each archive with a SHA-256 file, and attests build provenance.
+5. Creates the GitHub Release and attaches the archives and checksums.
+
+```console
+$ git tag v0.5.0
+$ git push origin v0.5.0
+```
+
+One-time repository setup:
+
+- On crates.io, configure **Trusted Publishing** for both `keres` and
+  `keres-cli`, pointing at `Keres-rs/keres` and
+  `.github/workflows/release.yml`.
+- Create a `release` **environment** in GitHub with required reviewers, so a
+  publish cannot happen without approval.
+- Ensure the workflow's `id-token: write` / `attestations: write` permissions
+  are allowed by the repository's Actions policy.
+
+The workflow is idempotent: if a crate version is already on crates.io it is
+skipped, so a failed release can be re-run from the same tag. `keres-cli`
+cannot be published before the matching `keres` version is live.
+
 ## 0.5.0
 
 - Consolidated the library, CLI, and documentation into one Cargo workspace.
@@ -13,6 +46,9 @@
   no longer re-encrypt data and blob identity is independent of the path.
 - Added workspace-wide CI for tests on Linux, Windows, and macOS, plus
   linting, rustdoc, package dry-runs, and the mdBook build.
+- Added `.github/workflows/release.yml`: tag-driven crates.io publishing
+  (library before CLI, Trusted Publishing), cross-platform binary archives,
+  SHA-256 checksums, build-provenance attestations, and a GitHub Release.
 - Added root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and
   `CHANGELOG.md`.
 - Hardened temp-file creation: files are created with `O_CREAT | O_EXCL`
@@ -39,5 +75,5 @@
 - Added crash-safe atomic writes.
 - Retired pre-0.4 formats.
 
-See [CHANGELOG.md](https://github.com/KeresOSS/keres/blob/main/CHANGELOG.md)
+See [CHANGELOG.md](https://github.com/Keres-rs/keres/blob/main/CHANGELOG.md)
 for the full history.

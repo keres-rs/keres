@@ -24,6 +24,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Vault::rename` / `keres rename` renames a top-level file or directory
   without re-encrypting it. Entries now carry a stable 128-bit random ID, and
   blob paths plus container AAD derive from that ID rather than the path.
+- Tag-driven release workflow: `keres` then `keres-cli` published via
+  crates.io Trusted Publishing, cross-platform `keres` binary archives with
+  SHA-256 checksums and build-provenance attestations, and a GitHub Release.
 
 ### Changed
 
@@ -92,8 +95,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Pre-0.4 formats are retired; old files are rejected.
 
-[Unreleased]: https://github.com/KeresOSS/keres/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/KeresOSS/keres/compare/v0.4.2...v0.5.0
-[0.4.2]: https://github.com/KeresOSS/keres/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/KeresOSS/keres/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/KeresOSS/keres/releases/tag/v0.4.0
+[Unreleased]: https://github.com/Keres-rs/keres/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Keres-rs/keres/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/Keres-rs/keres/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/Keres-rs/keres/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/Keres-rs/keres/releases/tag/v0.4.0

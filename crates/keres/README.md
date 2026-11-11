@@ -4,14 +4,14 @@ The Rust engine behind Keres: encrypted vaults and single-file encryption
 with encrypted filenames, built on AES-256-GCM and Argon2id.
 
 This crate is part of the
-[Keres monorepo](https://github.com/KeresOSS/keres).
+[Keres monorepo](https://github.com/Keres-rs/keres).
 
-**[Documentation](https://github.com/KeresOSS/keres/blob/main/docs/src/intro.md)**
-· **[Security](https://github.com/KeresOSS/keres/blob/main/SECURITY.md)**
-· **[Roadmap](https://github.com/KeresOSS/keres/blob/main/ROADMAP.md)**
-· **[Contributing](https://github.com/KeresOSS/keres/blob/main/CONTRIBUTING.md)**
+**[Documentation](https://github.com/Keres-rs/keres/blob/main/docs/src/intro.md)**
+· **[Security](https://github.com/Keres-rs/keres/blob/main/SECURITY.md)**
+· **[Roadmap](https://github.com/Keres-rs/keres/blob/main/ROADMAP.md)**
+· **[Contributing](https://github.com/Keres-rs/keres/blob/main/CONTRIBUTING.md)**
 
-See [SECURITY](https://github.com/KeresOSS/keres/blob/main/SECURITY.md)
+See [SECURITY](https://github.com/Keres-rs/keres/blob/main/SECURITY.md)
 for the threat model, design decisions, and known limitations. In particular,
 entry counts, directory shape, and approximate file sizes remain observable.
 
@@ -121,4 +121,4 @@ cargo clippy -p keres --all-targets -- -D warnings
 ## License
 
 Licensed under
-[Apache-2.0](https://github.com/KeresOSS/keres/blob/main/LICENSE).
+[Apache-2.0](https://github.com/Keres-rs/keres/blob/main/LICENSE).

@@ -9,7 +9,7 @@ edition = "2021"
 rust-version = "1.85"
 authors = ["Yash Sharma"]
 license = "Apache-2.0"
-repository = "https://github.com/KeresOSS/keres"
+repository = "https://github.com/Keres-rs/keres"
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["derive"] }

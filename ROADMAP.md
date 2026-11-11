@@ -13,7 +13,9 @@ matters most for the monorepo.
       Windows.
 - [x] Fuzzing for container, manifest, and config parsers.
 - [x] `cargo-deny` supply-chain checks.
-- [ ] Signed release artifacts.
+- [ ] Signed release artifacts (workflow now publishes via Trusted
+      Publishing and attests binaries; enable the `release` environment and
+      crates.io trusted publishers before the first tag).
 - [x] Published test vectors for the container format.
 - [x] Criterion benchmarks for the container pipeline.
 
