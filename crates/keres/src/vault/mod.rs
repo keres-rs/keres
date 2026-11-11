@@ -30,7 +30,7 @@ use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use crate::crypto::Key;
+use crate::crypto::{self, Key};
 use crate::error::{Error, Result};
 use crate::sanitize;
 
@@ -267,13 +267,15 @@ impl Vault {
         if source.is_dir() {
             add_directory_tree(&self.path, &master, &source, &root_name, &mut all)?;
         } else {
+            let id = new_entry_id();
             let meta = EntryMetadata {
+                id: id.clone(),
                 original_name: root_name.clone(),
                 original_size: fs::metadata(&source)?.len(),
                 is_directory: false,
                 children: None,
             };
-            blobs::write_entry(&self.path, &master, &root_name, &meta, Some(&source))?;
+            blobs::write_entry(&self.path, &master, &id, &meta, Some(&source))?;
             all.insert(root_name.clone(), meta);
         }
 
@@ -316,15 +318,89 @@ impl Vault {
                 "cannot replace a directory entry; remove it first".into(),
             ));
         }
+        let id = existing.id.clone();
 
         let meta = EntryMetadata {
+            id: id.clone(),
             original_name: name.to_string(),
             original_size: fs::metadata(&source)?.len(),
             is_directory: false,
             children: None,
         };
-        blobs::write_entry(&self.path, &master, name, &meta, Some(&source))?;
+        blobs::write_entry(&self.path, &master, &id, &meta, Some(&source))?;
         all.insert(name.to_string(), meta);
+        manifest::save(&self.path, &all, &master)?;
+        Ok(())
+    }
+
+    /// Renames a top-level file or directory entry without re-encrypting it.
+    ///
+    /// Because blob locations and container AAD are derived from the entry's
+    /// stable random ID, a rename only rewrites the (encrypted) manifest.
+    /// Directory renames rewrite the child paths inside the subtree as well.
+    ///
+    /// ```no_run
+    /// let mut vault = keres::Vault::new("secrets".into());
+    /// vault.unlock("correct horse")?;
+    /// vault.rename("notes.txt", "journal.txt")?;
+    /// # Ok::<(), keres::Error>(())
+    /// ```
+    pub fn rename(&mut self, from: &str, to: &str) -> Result<()> {
+        let master = self.require_unlocked()?;
+        let _lock = VaultLock::exclusive(&self.path)?;
+        sanitize::validate_new_name(from)?;
+        sanitize::validate_new_name(to)?;
+        if from == to {
+            return Ok(());
+        }
+
+        let mut all = manifest::load(&self.path, &master)?;
+        let original = all
+            .get(from)
+            .cloned()
+            .ok_or_else(|| Error::EntryNotFound(preview(from)))?;
+        if all.contains_key(to) {
+            return Err(Error::EntryExists(to.to_string()));
+        }
+
+        let old_prefix = format!("{from}/");
+        let new_prefix = format!("{to}/");
+        let mut moves = Vec::new();
+        if original.is_directory {
+            for (path, meta) in all.range(old_prefix.clone()..) {
+                if !path.starts_with(&old_prefix) {
+                    break;
+                }
+                moves.push((path.clone(), meta.clone()));
+            }
+        }
+        moves.push((from.to_string(), original));
+
+        // Remove every old key first so inserting new ones cannot collide with
+        // a stale subtree entry.
+        for (path, _) in &moves {
+            all.remove(path);
+        }
+
+        for (path, mut meta) in moves {
+            let new_path = if path == from {
+                to.to_string()
+            } else {
+                format!("{new_prefix}{}", &path[old_prefix.len()..])
+            };
+            meta.original_name = new_path.clone();
+            if let Some(children) = meta.children.as_mut() {
+                for child in children.iter_mut() {
+                    if let Some(suffix) = child.strip_prefix(&old_prefix) {
+                        *child = format!("{new_prefix}{suffix}");
+                    } else if child == from {
+                        *child = to.to_string();
+                    }
+                }
+            }
+            all.insert(new_path, meta);
+        }
+
         manifest::save(&self.path, &all, &master)?;
         Ok(())
     }
@@ -390,7 +466,7 @@ impl Vault {
             .clone();
 
         if !meta.is_directory {
-            stream_blob_to_file(&self.path, &master, name, dest, false)?;
+            stream_blob_to_file(&self.path, &master, &meta.id, dest, false)?;
             return Ok(dest.to_path_buf());
         }
 
@@ -408,7 +484,7 @@ impl Vault {
             if child_meta.is_directory {
                 crate::fsutil::create_private_dir(&target)?;
             } else {
-                stream_blob_to_file(&self.path, &master, child_path, &target, false)?;
+                stream_blob_to_file(&self.path, &master, &child_meta.id, &target, false)?;
             }
         }
         Ok(dest.to_path_buf())
@@ -485,7 +561,7 @@ impl Vault {
         };
 
         for (name, meta) in all.iter() {
-            match blobs::read_entry(&self.path, &master, name, meta.is_directory, |_| Ok(())) {
+            match blobs::read_entry(&self.path, &master, &meta.id, meta.is_directory, |_| Ok(())) {
                 Ok(_) => report.verified += 1,
                 Err(Error::Io(ref e)) if e.kind() == std::io::ErrorKind::NotFound => {
                     report.missing.push(name.clone());
@@ -519,8 +595,8 @@ impl Vault {
 
         let all = manifest::load(&self.path, &master)?;
         let referenced: std::collections::HashSet<PathBuf> = all
-            .keys()
-            .map(|name| blobs::blob_path(&self.path, &master, name))
+            .values()
+            .map(|meta| blobs::blob_path(&self.path, &master, &meta.id))
             .collect();
 
         let mut removed = 0usize;
@@ -576,6 +652,7 @@ fn add_directory_tree(
     all.insert(
         vault_name.to_string(),
         EntryMetadata {
+            id: new_entry_id(),
             original_name: vault_name.to_string(),
             original_size: 0,
             is_directory: true,
@@ -618,6 +695,7 @@ fn add_directory_tree(
             all.insert(
                 full.clone(),
                 EntryMetadata {
+                    id: new_entry_id(),
                     original_name: full.clone(),
                     original_size: 0,
                     is_directory: true,
@@ -626,13 +704,15 @@ fn add_directory_tree(
             );
             dir_paths.push(full.clone());
         } else if ft.is_file() {
+            let id = new_entry_id();
             let meta = EntryMetadata {
+                id: id.clone(),
                 original_name: full.clone(),
                 original_size: entry.metadata().map(|m| m.len()).unwrap_or(0),
                 is_directory: false,
                 children: None,
             };
-            blobs::write_entry(vault_dir, master, &full, &meta, Some(entry.path()))?;
+            blobs::write_entry(vault_dir, master, &id, &meta, Some(entry.path()))?;
             all.insert(full.clone(), meta);
         }
 
@@ -646,7 +726,7 @@ fn add_directory_tree(
     // Persist directory placeholder blobs (only the ones from this call).
     for dir_path in &dir_paths {
         if let Some(meta) = all.get(dir_path) {
-            blobs::write_entry(vault_dir, master, dir_path, meta, None)?;
+            blobs::write_entry(vault_dir, master, &meta.id, meta, None)?;
         }
     }
     Ok(())
@@ -665,7 +745,9 @@ fn remove_subtree(vault_dir: &Path, master: &Key, name: &str, all: &mut Manifest
         doomed.push(cur);
     }
     for cur in doomed {
-        let _ = blobs::remove_blob(vault_dir, master, &cur);
+        if let Some(meta) = all.get(&cur) {
+            let _ = blobs::remove_blob(vault_dir, master, &meta.id);
+        }
         all.remove(&cur);
     }
 }
@@ -680,7 +762,7 @@ fn join_sanitized(base: &Path, rel: &str) -> Result<PathBuf> {
 fn stream_blob_to_file(
     vault_dir: &Path,
     master: &Key,
-    entry_path: &str,
+    entry_id: &str,
     target: &Path,
     is_directory: bool,
 ) -> Result<()> {
@@ -690,7 +772,7 @@ fn stream_blob_to_file(
         {
             let f = crate::fsutil::create_private_file(&tmp)?;
             let mut w = std::io::BufWriter::new(f);
-            blobs::read_entry(vault_dir, master, entry_path, is_directory, |chunk| {
+            blobs::read_entry(vault_dir, master, entry_id, is_directory, |chunk| {
                 w.write_all(chunk)?;
                 Ok(())
             })?;
@@ -713,4 +795,11 @@ fn stream_blob_to_file(
 
 fn preview(name: &str) -> String {
     name.chars().take(64).collect()
+}
+
+/// Generates a 128-bit random entry identifier, hex-encoded.
+fn new_entry_id() -> String {
+    let mut bytes = [0u8; 16];
+    crypto::fill_random(&mut bytes);
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }

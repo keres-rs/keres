@@ -271,6 +271,68 @@ fn prune_refuses_without_manifest() {
     assert!(matches!(v.prune_orphans(), Err(Error::InvalidVault)));
 }
 
+#[test]
+fn rename_preserves_blob_identity() {
+    let (dir, mut v) = make_vault("rename");
+    let src = dir.path().join("old.txt");
+    std::fs::write(&src, b"same bytes").unwrap();
+    v.add(&src, None).unwrap();
+    let before = walk_blobs(&v.path().join("d"));
+    assert_eq!(before.len(), 1);
+
+    v.rename("old.txt", "new.txt").unwrap();
+
+    assert_eq!(
+        walk_blobs(&v.path().join("d")),
+        before,
+        "rename must not move or rewrite the blob"
+    );
+    assert!(matches!(
+        v.extract("old.txt", &dir.path().join("gone")),
+        Err(Error::EntryNotFound(_))
+    ));
+    let out = dir.path().join("out.txt");
+    v.extract("new.txt", &out).unwrap();
+    assert_eq!(std::fs::read(&out).unwrap(), b"same bytes");
+    let names: Vec<_> = v.list().unwrap().into_iter().map(|e| e.name).collect();
+    assert_eq!(names, vec!["new.txt"]);
+}
+
+#[test]
+fn rename_directory_moves_subtree() {
+    let (dir, mut v) = make_vault("renamedir");
+    let tree = dir.path().join("tree");
+    std::fs::create_dir_all(tree.join("sub")).unwrap();
+    std::fs::write(tree.join("sub/file.txt"), b"nested").unwrap();
+    v.add(&tree, None).unwrap();
+
+    v.rename("tree", "archive").unwrap();
+    assert!(matches!(
+        v.extract("tree", &dir.path().join("gone")),
+        Err(Error::EntryNotFound(_))
+    ));
+
+    let out = dir.path().join("restored");
+    v.extract("archive", &out).unwrap();
+    assert_eq!(std::fs::read(out.join("sub/file.txt")).unwrap(), b"nested");
+}
+
+#[test]
+fn rename_to_existing_name_fails() {
+    let (dir, mut v) = make_vault("renamecollision");
+    let a = dir.path().join("a.txt");
+    let b = dir.path().join("b.txt");
+    std::fs::write(&a, b"a").unwrap();
+    std::fs::write(&b, b"b").unwrap();
+    v.add(&a, None).unwrap();
+    v.add(&b, None).unwrap();
+
+    assert!(matches!(
+        v.rename("a.txt", "b.txt"),
+        Err(Error::EntryExists(_))
+    ));
+}
+
 fn walk_blobs(dir: &Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();
     for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {

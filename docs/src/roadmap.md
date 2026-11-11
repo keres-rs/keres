@@ -22,6 +22,10 @@ property will never be accepted for a compatibility or convenience win.
   increasing generation counter in the vault config and sign each manifest
   save with it, so restoring an old snapshot of the vault directory is at
   least *detectable* on next unlock.
+- **Stable entry identity** — blobs and container AAD are keyed by a random
+  128-bit entry ID stored in the manifest, not by the mutable path, so
+  `rename` rewrites only the manifest. *(Done. Manifest v3; `Vault::rename` /
+  `keres rename`. Manifest scaling and rollback protection remain.)*
 - **Concurrent-access safety** — non-blocking advisory locks around every
   vault read and write, so a second process fails fast with `VaultBusy`
   instead of clobbering the manifest. *(Done.)*

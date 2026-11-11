@@ -24,6 +24,7 @@ $ keres init personal
 $ keres add personal ./notes.txt
 $ keres add personal ./photos --name photos
 $ keres replace personal ./notes-v2.txt notes.txt
+$ keres rename personal notes.txt journal.txt
 $ keres list personal
 $ keres extract personal photos ./restored
 $ keres verify personal
@@ -39,6 +40,7 @@ $ keres remove personal notes.txt
 | `init <vault>` | Create a new vault |
 | `add <vault> <path> [--name NAME]` | Add a file or directory tree |
 | `replace <vault> <path> <name>` | Replace an existing file entry |
+| `rename <vault> <from> <to>` | Rename a top-level file or directory |
 | `remove <vault> <name> [--force]` | Remove an entry and, for directories, its subtree |
 | `list <vault>` | List top-level entries |
 | `extract <vault> <name> <dest> [--force]` | Restore an entry |

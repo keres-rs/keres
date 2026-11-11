@@ -98,7 +98,7 @@ Rules that keep the ecosystem stable forever:
    forever.
 3. A released `PayloadType` never changes meaning. New object kinds are
    new types with new AAD contexts.
-4. Schema-bearing payloads (config v2, manifest v2) carry their own inner
+4. Schema-bearing payloads (config v2, manifest v3) carry their own inner
    version integers, checked after authentication.
 5. Only the current format is accepted. Any other magic returns
    `IncompatibleFormat`; extract old data with the release that wrote it,

@@ -19,8 +19,8 @@ matters most for the monorepo.
 
 ## Next
 
-- [ ] Decouple entry identity from the mutable path so `rename`/`update` do
-      not require re-encryption.
+- [x] Decouple entry identity from the mutable path (stable random IDs), so
+      `rename` does not require re-encryption.
 - [ ] Public streaming API (`Read`/`Write` adapters), progress, and
       cancellation.
 - [ ] Entry metadata (mtime, mode) and `list --recursive` / `stat`.

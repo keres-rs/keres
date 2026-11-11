@@ -9,6 +9,8 @@
   shared one, and concurrent access returns `Error::VaultBusy`.
 - Added `Vault::replace` and `Vault::prune_orphans` (`keres replace`,
   `keres verify --prune`).
+- Added `Vault::rename` and stable random entry IDs (manifest v3), so renames
+  no longer re-encrypt data and blob identity is independent of the path.
 - Added workspace-wide CI for tests on Linux, Windows, and macOS, plus
   linting, rustdoc, package dry-runs, and the mdBook build.
 - Added root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and

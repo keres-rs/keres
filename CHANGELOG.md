@@ -21,6 +21,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Vault::prune_orphans` / `keres verify --prune` reclaims ciphertext blobs
   and stale temp files that no manifest record references, refusing to run
   when the manifest is missing.
+- `Vault::rename` / `keres rename` renames a top-level file or directory
+  without re-encrypting it. Entries now carry a stable 128-bit random ID, and
+  blob paths plus container AAD derive from that ID rather than the path.
 
 ### Changed
 
@@ -40,6 +43,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `keres-cli` now depends on the local library via a path dependency.
 - `unlock` now takes a shared advisory lock, so it cannot read the config in
   the middle of a concurrent password change.
+- The vault manifest schema is now version 3. Each entry records a non-empty
+  random ID; version 2 manifests (and version 3 manifests with a missing ID)
+  are rejected. Blobs are named from the ID, so entry paths are no longer
+  part of the on-disk layout or the AAD.
 - Release profile is defined once at the workspace root.
 - Minimum supported Rust version is now 1.85, matching the current
   dependency graph (`clap`, `rpassword`, `zeroize`, `base64ct`).

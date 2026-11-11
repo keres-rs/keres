@@ -25,11 +25,15 @@ use crate::error::{Error, Result};
 const MAX_MANIFEST_LEN: u64 = 64 * 1024 * 1024;
 
 /// Current manifest schema version (inside the authenticated payload).
-pub(crate) const MANIFEST_VERSION: u32 = 2;
+pub(crate) const MANIFEST_VERSION: u32 = 3;
 
 /// Metadata for one vault entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntryMetadata {
+    /// Stable random identifier. Blob location and container AAD are derived
+    /// from it, so entries can be renamed without re-encrypting.
+    #[serde(default)]
+    pub id: String,
     /// Original filesystem name of the entry.
     #[serde(default)]
     pub original_name: String,
@@ -102,6 +106,9 @@ pub(crate) fn decode(bytes: &[u8], master: &Key) -> Result<ManifestMap> {
         serde_json::from_slice(json.as_slice()).map_err(|_| Error::MalformedPayload)?;
     if manifest.version != MANIFEST_VERSION {
         return Err(Error::UnsupportedVersion(manifest.version));
+    }
+    if manifest.files.values().any(|entry| entry.id.is_empty()) {
+        return Err(Error::InvalidVault);
     }
     Ok(manifest.files)
 }

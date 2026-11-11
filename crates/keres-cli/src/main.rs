@@ -122,6 +122,15 @@ enum Commands {
         /// Name of the existing file entry in the vault.
         name: String,
     },
+    /// Rename a top-level file or directory in the vault.
+    Rename {
+        /// Vault name (stored in `~/.keres/vaults/<name>`).
+        vault: String,
+        /// Current name in the vault.
+        from: String,
+        /// New name in the vault.
+        to: String,
+    },
     /// Remove a file or folder from the vault.
     Remove {
         /// Vault name (stored in `~/.keres/vaults/<name>`).
@@ -352,6 +361,14 @@ fn run(command: Commands, passwords: &PasswordSource) -> Result<()> {
             v.unlock(password.as_str())?;
             v.replace(&path, &name)?;
             println!("Replaced successfully!");
+        }
+        Commands::Rename { vault, from, to } => {
+            let dir = existing_vault_path(&vault)?;
+            let password = passwords.read("Enter vault password")?;
+            let mut v = Vault::new(dir);
+            v.unlock(password.as_str())?;
+            v.rename(&from, &to)?;
+            println!("Renamed '{from}' to '{to}'");
         }
         Commands::Remove { vault, name, force } => {
             let dir = existing_vault_path(&vault)?;

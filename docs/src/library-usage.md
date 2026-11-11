@@ -40,6 +40,9 @@ vault.add(Path::new("photos"), Some("pictures"))?;
 // Replace an existing file entry without removing it first.
 vault.replace(Path::new("report-v2.pdf"), "report.pdf")?;
 
+// Rename a top-level entry; ciphertext is not rewritten.
+vault.rename("report.pdf", "report-final.pdf")?;
+
 for entry in vault.list()? {
     println!("{} — {} bytes, dir: {}", entry.name, entry.size, entry.is_directory);
 }
