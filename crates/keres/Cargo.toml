@@ -20,7 +20,7 @@ name = "keres"
 aes-gcm = "0.10"
 argon2 = "0.5"
 fs4 = { version = "1.1", default-features = false, features = ["sync"] }
-hkdf = "0.12"
+hkdf = "0.13"
 sha2 = "0.10"
 subtle = "2"
 serde = { version = "1.0", features = ["derive"] }
