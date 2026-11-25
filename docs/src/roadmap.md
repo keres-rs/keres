@@ -22,6 +22,9 @@ compatibility or convenience.
   state this improves detection, not prevention.
 - **Documentation and examples.** Keep the book, rustdoc, and CLI help in
   sync; add end-to-end examples for recovery and rotation.
+- **Embedding ergonomics.** Continue widening the in-memory API (for example
+  streaming `Read` handles for vault entries), and add a flagship application
+  example that looks like a real local-first app rather than a toy.
 
 ## 1.0 readiness
 

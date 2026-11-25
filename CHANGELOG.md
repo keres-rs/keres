@@ -4,6 +4,30 @@ All notable changes to this workspace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- In-memory vault access: `Vault::add_from_reader`,
+  `Vault::replace_from_reader`, and `Vault::extract_to_writer` store and read
+  entries from any `std::io::Read`/`std::io::Write` without temporary files.
+  Padded vaults require the exact plaintext length up front; unpadded vaults
+  may stream an unknown length.
+- Configurable Argon2id cost: `EncryptOptions` /
+  `encrypt_file_with_options`, `VaultOptions` / `Vault::init_with_options`,
+  and `StreamOptions::kdf`. `KdfParams` is re-exported from the crate root,
+  and new keyslots inherit the vault's parameters.
+- `examples/in_memory.rs` and `examples/vault_store.rs` show embedded use.
+- New "Embedding Keres" book chapter covering async wrapping, key management,
+  concurrency, padding, and API stability.
+
+### Changed
+
+- The crate is now positioned as an embedded storage engine for Rust
+  applications. The CLI is documented as the reference implementation.
+- The crate-level and `Vault` quick-start examples no longer call `unlock`
+  immediately after `init` (which already leaves a new vault unlocked).
+
 ## [0.7.1] - 2026-11-25
 
 This release contains no container-format, vault-format, or API changes.

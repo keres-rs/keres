@@ -83,7 +83,14 @@ assert_eq!(name, "report.pdf");
 let mut vault = Vault::new("personal".into());
 vault.init("correct horse")?;
 vault.add(Path::new("photos"), Some("photos"))?;
-vault.add(Path::new("notes.txt"), None)?;
+
+// Bytes already in memory can be stored and read without temp files.
+let note = b"a note from the application";
+vault.add_from_reader("notes.txt", &note[..], Some(note.len() as u64))?;
+let mut restored = Vec::new();
+vault.extract_to_writer("notes.txt", &mut restored)?;
+assert_eq!(restored, note);
+
 vault.extract("photos", Path::new("./restored"))?;
 vault.lock();
 # Ok::<(), keres::Error>(())
@@ -94,7 +101,9 @@ vault.lock();
 
 ## Where to go next
 
+- [Library guide](./library-usage.md) for the full API.
+- [Embedding Keres](./embedding.md) for async, key management, and concurrency
+  guidance.
 - [CLI guide](./cli-usage.md) for workflows, destructive operations, and
   automation.
-- [Library guide](./library-usage.md) for the full API.
 - [Security model](./security.md) for what Keres does and does not protect.

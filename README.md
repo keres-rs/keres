@@ -5,17 +5,45 @@
 [![docs.rs](https://docs.rs/keres/badge.svg)](https://docs.rs/keres)
 [![MSRV](https://img.shields.io/badge/MSRV-1.85-blue.svg)](https://github.com/Keres-rs/keres/blob/main/Cargo.toml)
 
-Keres encrypts files and directories at rest. It is available as a Rust
-library (`keres`) and a command-line tool (`keres-cli`). Both use the same
-container format, so data written by one can be read by the other.
+Keres is an embedded encrypted storage engine for Rust applications. It gives
+you authenticated file storage with encrypted names and directory structure,
+crash-safe updates, key rotation, and recovery, without designing a container
+format or key hierarchy yourself.
 
-There are two ways to use it:
+```rust
+use keres::{Result, Vault};
 
-- **Single-file encryption** turns one file into a self-contained `.krs`
-  container. The original filename is encrypted inside the container.
-- **Vaults** hold many files and directory trees under one password, with an
-  encrypted index. Entries can be listed, renamed, replaced, or removed
-  without decrypting the whole vault.
+fn store_attachment(vault: &mut Vault, name: &str, bytes: &[u8]) -> Result<()> {
+    vault.add_from_reader(name, bytes, Some(bytes.len() as u64))
+}
+
+fn load_attachment(vault: &Vault, name: &str) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    vault.extract_to_writer(name, &mut out)?;
+    Ok(out)
+}
+```
+
+Use it when your application owns files that must be confidential and
+tamper-evident at rest: a local-first notes app, a desktop client, an
+attachment store, or a service that keeps user documents on disk.
+
+- **Embedded, not a service.** No mount, daemon, database, async runtime, or
+  `unsafe` code. The crate is a library first.
+- **Streaming.** `Read`/`Write` adapters and vault readers/writers keep memory
+  bounded regardless of file size.
+- **Encrypted metadata.** Entry names and directory layout never appear in
+  plaintext. Opt-in size padding hides exact sizes behind buckets.
+- **Crash safe.** Configs, indexes, and outputs are staged and committed
+  atomically, with journaled rotation and compaction.
+- **Configurable cost.** Argon2id parameters are selectable per container and
+  stored inside the ciphertext, so defaults can evolve without breaking old
+  files.
+- **Operable.** Multiple keyslots, password changes, deep key rotation,
+  crypto-erasure, recovery kits, and full-integrity verification.
+
+The `keres` command-line tool in `keres-cli/` is the reference implementation
+and a scripting/debugging aid. It uses the same format as the library.
 
 > **Status:** Keres is pre-1.0 (0.7.x). The container format is versioned and
 > tested, but the public API may still change. The project has not yet had an
@@ -25,68 +53,99 @@ There are two ways to use it:
 
 ## Install
 
-Command-line tool:
-
-```console
-$ cargo install keres-cli
-```
-
-Library:
-
 ```toml
 [dependencies]
 keres = "0.7"
 ```
 
-Prebuilt CLI archives for Linux, macOS, and Windows are attached to
-[GitHub Releases](https://github.com/Keres-rs/keres/releases). Nix users can
-run `nix run . -- --help` from a checkout. The minimum supported Rust version
-is 1.85.
+The minimum supported Rust version is 1.85. The library builds on Linux,
+macOS, and Windows, including ARM targets, because it has no
+architecture-specific code.
 
-## Quick start
-
-Create a vault, add a directory, and restore it:
+The reference CLI is installed separately:
 
 ```console
-$ keres init personal
-$ keres add personal ./photos --name photos
-$ keres list personal
-$ keres extract personal photos ./restored
-$ keres verify personal
+$ cargo install keres-cli
 ```
 
-Encrypt and decrypt a single file:
+Prebuilt CLI archives for Linux x86_64, macOS ARM64, and Windows x86_64 are
+attached to [GitHub Releases](https://github.com/Keres-rs/keres/releases).
+Other platforms should use `cargo install keres-cli`. Nix users can run
+`nix run . -- --help` from a checkout.
 
-```console
-$ keres encrypt document.pdf
-Encrypted to: 6f1c0e...c2a.krs
+## Embedding quick start
 
-$ keres decrypt 6f1c0e...c2a.krs document.pdf
-```
-
-The CLI prompts for passwords by default. Avoid putting passwords on the
-command line; use a terminal prompt, `--password-file`, `--password-stdin`,
-or `KERES_PASSWORD` for automation.
-
-The same operations from Rust:
+Create or unlock a vault, then read and write entries without temporary files:
 
 ```rust
-use keres::{decrypt_file, encrypt_file, Vault};
-use std::path::Path;
+use keres::{KdfParams, Result, Vault, VaultOptions};
 
-// Single file: name is encrypted inside the container.
-let container = encrypt_file("correct horse", Path::new("document.pdf"), None)?;
-let original_name = decrypt_file("correct horse", &container, Path::new("restored.pdf"))?;
-assert_eq!(original_name, "document.pdf");
+fn open_store(path: std::path::PathBuf, password: &str) -> Result<Vault> {
+    let mut vault = Vault::new(path);
+    if vault.exists() {
+        vault.unlock(password)?;
+    } else {
+        // A real application would usually keep the defaults. Lowering the
+        // cost here only keeps examples and tests fast.
+        vault.init_with_options(
+            password,
+            VaultOptions::new().kdf(KdfParams {
+                m_cost_kib: 8 * 1024,
+                t_cost: 1,
+                p_cost: 1,
+            }),
+        )?;
+    }
+    Ok(vault)
+}
 
-// Vault.
-let mut vault = Vault::new("myvault".into());
-vault.init("correct horse")?;
-vault.add(Path::new("photos"), Some("photos"))?;
-vault.add(Path::new("notes.txt"), None)?;
-vault.extract("photos", Path::new("./restored"))?;
-vault.lock();
+fn main() -> Result<()> {
+    let dir = std::env::temp_dir().join(format!("keres-readme-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let mut vault = open_store(dir.join("vault"), "correct horse")?;
+
+    let attachment = b"application data".to_vec();
+    vault.add_from_reader("report.txt", &attachment[..], Some(attachment.len() as u64))?;
+
+    for entry in vault.list()? {
+        println!("{} ({} bytes)", entry.name, entry.size);
+    }
+
+    let mut restored = Vec::new();
+    vault.extract_to_writer("report.txt", &mut restored)?;
+    assert_eq!(restored, attachment);
+
+    vault.lock();
+    std::fs::remove_dir_all(&dir)?;
+    Ok(())
+}
 ```
+
+Path-based helpers are available too: `add`, `replace`, `extract`, and
+`apply_batch`. For standalone `.krs` containers, use `encrypt_file` /
+`decrypt_file` or the streaming API:
+
+```rust
+use keres::streaming::{decrypt_stream, encrypt_stream, StreamOptions};
+use std::io::Cursor;
+
+let mut ciphertext = Vec::new();
+encrypt_stream(
+    "correct horse",
+    &mut Cursor::new(b"one self-contained object"),
+    &mut ciphertext,
+    Some("note.txt"),
+    StreamOptions::new(),
+)?;
+
+let mut plaintext = Vec::new();
+decrypt_stream("correct horse", Cursor::new(ciphertext), &mut plaintext, StreamOptions::new())?;
+```
+
+The [library guide](https://keres-rs.github.io/library-usage.html) covers
+lifecycle, keyslots, recovery, rotation, padding, and concurrency. The
+[embedding guide](https://keres-rs.github.io/embedding.html) covers async
+runtimes, key management, error policy, and a shipping checklist.
 
 ## How it works
 
@@ -106,8 +165,32 @@ authenticated container:
 
 Vault metadata is protected too: names, directory structure, and the index
 are encrypted. A password change re-wraps the master key instead of
-re-encrypting stored data. Deep rotation (`keres rotate`) is available when
-the data key itself must change.
+re-encrypting stored data. Deep rotation is available when the data key itself
+must change.
+
+## Reference CLI
+
+The CLI exposes the same operations for scripts and manual recovery:
+
+```console
+$ keres init personal
+$ keres add personal ./photos --name photos
+$ keres list personal
+$ keres extract personal photos ./restored
+$ keres verify personal
+```
+
+```console
+$ keres encrypt document.pdf
+Encrypted to: 6f1c0e...c2a.krs
+
+$ keres decrypt 6f1c0e...c2a.krs document.pdf
+```
+
+The CLI prompts for passwords by default. Avoid putting passwords on the
+command line; use a terminal prompt, `--password-file`, `--password-stdin`,
+or `KERES_PASSWORD` for automation. See the
+[CLI reference](https://keres-rs.github.io/cli-reference.html).
 
 ## Security model
 
@@ -140,15 +223,16 @@ The full threat model, guarantees, and limitations are in the
 | Path | Contents |
 |---|---|
 | `src/` | The `keres` library |
-| `keres-cli/` | The `keres` binary |
+| `examples/` | Runnable embedding examples |
+| `keres-cli/` | The reference CLI (not the product) |
 | `docs/` | mdBook documentation source |
 | `tests/`, `benches/` | Integration tests and Criterion benchmarks |
 | `fuzz/` | `cargo-fuzz` targets (separate workspace) |
 
 ## Documentation
 
-- [The Keres book](https://keres-rs.github.io) — installation, CLI and
-  library guides, architecture, and security model.
+- [The Keres book](https://keres-rs.github.io) — installation, embedding and
+  CLI guides, architecture, and security model.
 - [API reference](https://docs.rs/keres) — generated rustdoc.
 - [CHANGELOG.md](https://github.com/Keres-rs/keres/blob/main/CHANGELOG.md) —
   release history.
@@ -167,6 +251,8 @@ $ cargo test --workspace --doc
 $ cargo clippy --workspace --all-targets -- -D warnings
 $ cargo fmt --all -- --check
 $ cargo doc --workspace --no-deps
+$ cargo run --example in_memory
+$ cargo run --example vault_store
 $ mdbook serve docs
 ```
 

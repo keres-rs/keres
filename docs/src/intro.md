@@ -1,8 +1,15 @@
 # Introduction
 
-Keres is a local-first encryption tool for files and directories. It ships as
-a library (`keres`) and a command-line program (`keres`), both built on the
-same container format and cryptographic core.
+Keres is an embedded encrypted storage engine for Rust applications: a
+library (`keres`) for storing application files, plus a reference
+command-line program (`keres`) built on the same container format and
+cryptographic core.
+
+It is aimed at developers building local-first apps, desktop clients, and
+services that own files on disk. Keres supplies authenticated streaming,
+encrypted metadata, crash-safe updates, key rotation, and recovery, so the
+application does not have to design its own format. The CLI is the reference
+implementation and a scripting/debugging tool, not the product.
 
 Keres is designed around one rule: **do not release plaintext until its
 authenticity has been checked.** Every record is authenticated, and metadata
@@ -74,8 +81,9 @@ Keres does **not** try to provide:
 
 - [Installation](./install.md) — install the CLI or add the library.
 - [Quick start](./usage.md) — encrypt a file and create a vault.
-- [CLI guide](./cli-usage.md) — workflows and command behavior.
 - [Library guide](./library-usage.md) — API patterns and examples.
+- [Embedding Keres](./embedding.md) — integration guidance for applications.
+- [CLI guide](./cli-usage.md) — workflows and command behavior.
 - [Architecture](./architecture.md) — wire format, key hierarchy, and crash
   safety.
 - [Security model](./security.md) — attacker model, guarantees, and

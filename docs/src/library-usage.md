@@ -8,6 +8,7 @@ blocks:
 | Single-file | `keres::{encrypt_file, decrypt_file}` | One self-contained `.krs` container |
 | Vault | `keres::Vault` | Many files and directories under one password |
 | Streaming | `keres::streaming` | `Read`/`Write` adapters over the same format |
+| Options | `keres::{EncryptOptions, VaultOptions, KdfParams}` | Padding and Argon2id cost selection |
 | Building blocks | `keres::crypto`, `keres::kdf`, `keres::padding` | Primitives and parameter types |
 
 Everything commonly used is re-exported from `keres::prelude`. All fallible
@@ -59,6 +60,34 @@ let container = keres::encrypt_file_with_padding(
 # Ok::<(), keres::Error>(())
 ```
 
+To change padding and the Argon2id cost together, use `EncryptOptions`:
+
+```rust
+use keres::{EncryptOptions, KdfParams};
+use std::path::Path;
+
+let options = EncryptOptions::new()
+    .padding(keres::Padding::Adaptive)
+    .kdf(KdfParams {
+        m_cost_kib: 32 * 1024, // 32 MiB
+        t_cost: 3,
+        p_cost: 2,
+    });
+let container = keres::encrypt_file_with_options(
+    "correct horse",
+    Path::new("report.pdf"),
+    None,
+    options,
+)?;
+# Ok::<(), keres::Error>(())
+```
+
+`KdfParams::new()` is the default: Argon2id with 64 MiB, 4 passes, and
+parallelism 4. Lower values make tests and memory-constrained devices faster;
+they also make offline guessing cheaper, so choose deliberately. Parameters
+are stored in the container and read back on decryption, which means raising
+the cost never breaks existing files.
+
 ## Vault lifecycle
 
 ```rust
@@ -70,8 +99,10 @@ let mut vault = Vault::new("myvault".into());
 // Create. Fails if the path is already an initialized vault.
 // `init` leaves the vault unlocked.
 vault.init("correct horse")?;
+vault.lock();
 
 // Later, in a new process:
+let mut vault = Vault::new("myvault".into());
 vault.unlock("correct horse")?;
 vault.add(Path::new("report.pdf"), None)?;
 vault.lock();
@@ -83,15 +114,37 @@ vault.lock();
 
 | Method | Requires unlocked | Notes |
 |---|---|---|
-| `init`, `init_with_padding` | no | Creates the vault and leaves it unlocked |
+| `init`, `init_with_padding`, `init_with_options` | no | Creates the vault and leaves it unlocked |
 | `unlock`, `lock` | no | Loads/drops the master key in memory |
-| `add`, `replace`, `rename`, `remove` | yes | Mutations commit through the index |
+| `add`, `replace`, `add_from_reader`, `replace_from_reader` | yes | Write file entries |
+| `rename`, `remove` | yes | Mutations commit through the index |
 | `add_if`, `replace_if`, `apply_batch` | yes | Conditional or batched mutations |
-| `list`, `extract`, `padding`, `version` | yes | Read or inspect the index |
+| `list`, `extract`, `extract_to_writer`, `padding`, `version` | yes | Read or inspect the index |
 | `verify` | either | Takes the password; restores the previous lock state |
 | `change_password`, `rotate`, `erase`, `migrate`, `recover` | no | Authenticate the password/code passed to them |
 | `keyslots` | no | Slot ids are plaintext metadata |
 | `create_recovery_kit` | no | Verifies the password passed to it |
+
+`init_with_options` sets the initial size-padding policy and Argon2id
+parameters in one call. New keyslots and password changes inherit those
+parameters, so a vault keeps the cost chosen when it was created.
+
+```rust
+use keres::{KdfParams, Padding, Vault, VaultOptions};
+
+let mut vault = Vault::new("myvault".into());
+vault.init_with_options(
+    "correct horse",
+    VaultOptions::new()
+        .padding(Padding::Adaptive)
+        .kdf(KdfParams {
+            m_cost_kib: 32 * 1024,
+            t_cost: 3,
+            p_cost: 2,
+        }),
+)?;
+# Ok::<(), keres::Error>(())
+```
 
 ## Adding and reading entries
 
@@ -150,6 +203,45 @@ vault.remove("report-final.pdf")?;
 vault.lock();
 # Ok::<(), keres::Error>(())
 ```
+
+## In-memory readers and writers
+
+Applications often hold data in memory or receive it from a network rather
+than reading it from a file. `add_from_reader` and `replace_from_reader`
+accept any `Read`, and `extract_to_writer` writes to any `Write`:
+
+```rust
+use keres::Vault;
+
+let mut vault = Vault::new("myvault".into());
+vault.unlock("correct horse")?;
+
+let attachment = b"bytes from an upload".to_vec();
+vault.add_from_reader("upload.bin", &attachment[..], Some(attachment.len() as u64))?;
+
+let mut restored = Vec::new();
+let size = vault.extract_to_writer("upload.bin", &mut restored)?;
+assert_eq!(size, attachment.len() as u64);
+assert_eq!(restored, attachment);
+
+vault.lock();
+# Ok::<(), keres::Error>(())
+```
+
+`add_from_reader` accepts top-level names, like `add`. `replace_from_reader`
+and `extract_to_writer` also address nested children by their full
+`parent/child` path.
+
+The `len` argument is the exact number of plaintext bytes the reader will
+yield. It is required when the vault uses size padding, because the padded
+length must be known before encryption starts; for an unpadded vault, pass
+`None` to stream without knowing the size. A mismatch between `len` and the
+actual stream is reported as `Error::Operation` and nothing is committed.
+
+`extract_to_writer` returns the authenticated size. As with all streaming
+reads, the trailer is verified only after the last chunk, so a caller that
+must not use unverified plaintext should stage the output and discard it on
+error.
 
 ## Batches and conditional writes
 
@@ -409,8 +501,10 @@ assert_eq!(info.original_name.as_deref(), Some("note.txt"));
 ```
 
 `EncryptWriter` and `DecryptReader` are the underlying `Write`/`Read`
-adapters. `StreamOptions` supports a cumulative progress callback and an
-`AtomicBool` cancellation flag.
+adapters. `StreamOptions` supports a cumulative progress callback, an
+`AtomicBool` cancellation flag, and custom Argon2id parameters through
+`.kdf(...)`. Decryption always reads the parameters from the container
+header, so the setting only affects encryption.
 
 > **Integrity caveat:** each chunk is authenticated before its plaintext is
 > yielded, but the trailer (total size and chunk count) can only be checked at

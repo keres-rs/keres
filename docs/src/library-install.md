@@ -30,7 +30,8 @@ Keres performs filesystem I/O and uses the operating system random source.
 
 - API reference: [docs.rs/keres](https://docs.rs/keres)
 - Local rustdoc: `cargo doc -p keres --open`
-- Guides: [Library guide](./library-usage.md)
+- Guides: [Library guide](./library-usage.md),
+  [Embedding Keres](./embedding.md)
 
 ## Working from a checkout
 

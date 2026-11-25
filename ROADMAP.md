@@ -1,9 +1,10 @@
 # Roadmap
 
-Keres is pre-1.0 and developed security-first. This page summarizes the
-current priorities; the detailed, itemized roadmap is in
-[docs/src/roadmap.md](docs/src/roadmap.md), and completed work is recorded in
-[CHANGELOG.md](CHANGELOG.md).
+Keres is pre-1.0 and developed security-first. The primary user is a Rust
+developer embedding the library in a local-first application; the CLI is the
+reference implementation. This page summarizes the current priorities; the
+detailed, itemized roadmap is in [docs/src/roadmap.md](docs/src/roadmap.md),
+and completed work is recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## Before 1.0
 
@@ -12,7 +13,13 @@ current priorities; the detailed, itemized roadmap is in
   substitute.
 - **API and format freeze.** Stabilize the public Rust API and commit to the
   current envelope, config, and manifest versions as the long-term
-  compatibility contract.
+  compatibility contract. Add `cargo-semver-checks` and a written MSRV policy
+  before cutting a 1.0 release candidate.
+- **Normative format specification.** Turn the architecture chapter and test
+  vectors into a standalone document so applications are not locked to this
+  crate.
+- **Flagship embedding example.** A small desktop or Tauri application that
+  stores attachments with Keres, beyond the current `examples/` programs.
 - **Memory locking.** Evaluate `mlock` and core-dump suppression behind a
   small, audited unsafe boundary. Disabled by default.
 - **Hardware-backed factors.** Optional TPM, Secure Enclave, or FIDO2
