@@ -551,7 +551,7 @@ dependencies = [
 
 [[package]]
 name = "keres"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "keres-cli"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "clap",
  "keres",

@@ -1,65 +1,55 @@
 # Roadmap
 
-The detailed, security-first roadmap lives in
-[`docs/src/roadmap.md`](docs/src/roadmap.md). This page tracks the work that
-matters most for the monorepo.
+Keres is pre-1.0 and developed security-first. This page summarizes the
+current priorities; the detailed, itemized roadmap is in
+[docs/src/roadmap.md](docs/src/roadmap.md), and completed work is recorded in
+[CHANGELOG.md](CHANGELOG.md).
 
-## Now
+## Before 1.0
 
-- [x] Consolidate the core, CLI, and documentation into one workspace.
-- [x] Vault-level file locking (`flock`) so concurrent processes cannot
-      clobber the manifest.
-- [x] Cross-platform CI (Windows and macOS) and an atomic replace path for
-      Windows.
-- [x] Fuzzing for container, manifest, and config parsers.
-- [x] `cargo-deny` supply-chain checks.
-- [ ] Signed release artifacts (workflow now publishes via Trusted
-      Publishing and attests binaries; enable the `release` environment and
-      crates.io trusted publishers before the first tag).
-- [x] Published test vectors for the container format.
-- [x] Criterion benchmarks for the container pipeline.
+- **External security audit.** A professional review of the container format,
+  key hierarchy, and implementation. Internal review and fuzzing are not a
+  substitute.
+- **API and format freeze.** Stabilize the public Rust API and commit to the
+  current envelope, config, and manifest versions as the long-term
+  compatibility contract.
+- **Memory locking.** Evaluate `mlock` and core-dump suppression behind a
+  small, audited unsafe boundary. Disabled by default.
+- **Hardware-backed factors.** Optional TPM, Secure Enclave, or FIDO2
+  `hmac-secret` support alongside a password.
 
-## Next
+## Operational hardening
 
-- [x] `keres migrate`: re-encrypt 0.5.0 (manifest v2) vaults into v3 in place
-      (stable IDs, atomic manifest cut-over, legacy blobs removed).
-- [x] Decouple entry identity from the mutable path (stable random IDs), so
-      `rename` does not require re-encryption.
-- [x] Public streaming API (`Read`/`Write` adapters), progress, and
-      cancellation (`keres::streaming`, `EncryptWriter`/`DecryptReader`).
-- [ ] Entry metadata (mtime, mode) and `list --recursive` / `stat`.
-- [x] Printable recovery kit (`keres recovery create` / `recovery use`,
-      `Vault::create_recovery_kit` / `Vault::recover`).
-- [x] LUKS-style keyslots (`Vault::add_keyslot` / `remove_keyslot`,
-      `keres keyslot add|remove|list`; config v3 slot table).
-- [x] Opt-in deep rotation (`Vault::rotate` / `keres rotate`): fresh master
-      key, every entry re-encrypted, journal-based crash recovery; collapses
-      to one keyslot and removes the recovery kit.
-- [ ] Multi-recipient keys (X25519).
-- [x] Orphan garbage collection (`verify --prune`).
-- [x] Append-only encrypted index log with snapshot compaction, journaled
-      crash recovery, and automatic journal recovery on lock acquisition.
-- [x] Internal index generations: authenticated in the snapshot, matched by
-      the log, advanced by compaction, with crash-phase recovery tests.
-- [x] Opt-in L2 size padding: adaptive/fixed buckets, padded v2 containers,
-      vault policy in the authenticated index, CLI `--padding`/`padding`.
-- [x] Conditional writes (`if-match`/`if-none-match`): `Vault::version`,
-      `add_if`, `replace_if`, `WriteOutcome`, `Error::Conflict`.
-- [x] Explicit batch commit: `Vault::apply_batch` + `BatchOp`.
-- [x] Crypto-erasure: `Vault::erase` + CLI `erase` (rotates master key).
-- [x] Metadata-leakage matrix published in `docs/src/security.md`.
-- [ ] Group commit timing coarsening (jittered flush) — deferred to 1.0.
-- [ ] Operation-count bucketing (coarse count hiding) — deferred.
-- [ ] Parallel chunk pipeline — deferred.
+- Group commit for concurrent vault writers.
+- Crash-injection tests for rotation, compaction, and migration.
+- Cross-platform filesystem coverage, including behavior on network and
+  FUSE filesystems.
+- Optional timing and mutation-count coarsening for the index log.
 
-## Later
+## Performance and ergonomics
 
-- [x] Optional size-hiding padding buckets (opt-in, adaptive/fixed).
-- [ ] Snapshot/version history and restore.
-- [ ] Hardware-backed keys (TPM, Secure Enclave, FIDO2).
-- [ ] External security audit and a 1.0 release.
+- A parallel chunk pipeline. The format already permits it: chunks are
+  independent.
+- Entry metadata (mode, mtime) and recursive listing.
+- Multi-recipient keys (X25519).
 
 ## Out of scope
 
-- Plausible deniability / hidden volumes.
-- Backwards-compatible readers for pre-0.4 formats.
+- Plausible deniability and hidden volumes. The container magic is deliberate;
+  deniable schemes conflict with authenticated formats and invite user error.
+- Backward-compatibility readers for retired formats. The one exception is
+  the one-way v2 → v3 vault upgrade in `keres migrate`.
+- Access-pattern hiding (ORAM). Keres documents access-pattern leakage rather
+  than claiming to hide it.
+- Network synchronization. Keres encrypts local files; syncing services are
+  outside the trust boundary.
+
+## How priorities are chosen
+
+1. Security defects and data-loss risks.
+2. Correctness and crash safety.
+3. Documentation and usability gaps that can cause data loss.
+4. Performance and ergonomics.
+
+Proposals that add a new format, a new primitive, or a new privileged code
+path need a written design and tests before implementation.

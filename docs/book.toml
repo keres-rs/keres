@@ -1,9 +1,12 @@
 [book]
-title = "The Keres Documentation"
+title = "Keres Documentation"
 authors = ["Yash Sharma"]
 language = "en"
 src = "src"
 
 [output.html]
+default-theme = "rust"
+preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/Keres-rs/keres"
 edit-url-template = "https://github.com/Keres-rs/keres/edit/main/docs/{path}"
+additional-css = ["theme/keres.css"]

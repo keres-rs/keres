@@ -9,7 +9,7 @@ and multi-file vaults. It is a thin wrapper over
 From the workspace root:
 
 ```console
-$ cargo install --path crates/keres-cli
+$ cargo install --path keres-cli
 ```
 
 Or, once published:

@@ -18,7 +18,7 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
-keres = { path = "../keres", version = "0.7.0" }
+keres = { path = "..", version = "0.7.1" }
 clap.workspace = true
 rpassword.workspace = true
 zeroize.workspace = true

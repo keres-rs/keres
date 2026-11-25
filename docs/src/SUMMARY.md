@@ -1,18 +1,35 @@
 # Summary
 
-- [Preface](./preface.md)
-- [Introduction to Keres](./intro.md)
-- [Installation Guide](./install.md)
-  - [Keres library](./library-install.md)
-  - [Keres CLI](./cli-install.md)
+[Preface](./preface.md)
+
+- [Introduction](./intro.md)
+
+# Getting started
+
+- [Installation](./install.md)
+  - [Library](./library-install.md)
+  - [Command-line tool](./cli-install.md)
   - [Building from source](./full-install.md)
-- [Using Keres](./usage.md)
-  - [Keres library](./library-usage.md)
-  - [Keres CLI](./cli-usage.md)
-  - [Keres GUI (separate repository)](./gui-usage.md)
+- [Quick start](./usage.md)
+
+# Guides
+
+- [Library guide](./library-usage.md)
+- [CLI guide](./cli-usage.md)
+- [Recovery, rotation, and migration](./operations.md)
+- [GUI (separate repository)](./gui-usage.md)
+
+# Reference
+
+- [CLI reference](./cli-reference.md)
 - [Architecture](./architecture.md)
-- [Security](./security.md)
-- [Test vectors](./test-vectors.md)
+- [Security model](./security.md)
+- [Performance](./performance.md)
+- [Format test vectors](./test-vectors.md)
+- [Troubleshooting](./troubleshooting.md)
+
+# Project
+
 - [Roadmap](./roadmap.md)
 - [Contributing](./contributing.md)
-- [Release Notes](./release.md)
+- [Release process](./release.md)

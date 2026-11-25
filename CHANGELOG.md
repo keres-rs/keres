@@ -4,6 +4,25 @@ All notable changes to this workspace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-11-25
+
+This release contains no container-format, vault-format, or API changes.
+Vaults and `.krs` containers written by 0.7.0 remain readable.
+
+### Changed
+
+- Repository layout now puts the library at the repository root, matching the
+  smithay-style workspace layout. The `keres` crate occupies `src/`, `tests/`,
+  and `benches/` with the root `Cargo.toml` serving as both its package
+  manifest and the workspace manifest; `keres-cli` stays in `keres-cli/`.
+  Install the CLI with `cargo install --path keres-cli` or, from crates.io,
+  `cargo install keres-cli`.
+- Documentation rewritten as a complete reference. The book is organized into
+  getting started, guides, and reference chapters, with new pages for the CLI
+  reference, recovery and rotation, performance, and troubleshooting. The
+  README, `CONTRIBUTING.md`, `SECURITY.md`, and `ROADMAP.md` were rewritten to
+  match, and the published crate now excludes repository-only files.
+
 ## [0.7.0] - 2026-11-19
 
 ### Added
@@ -237,6 +256,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Pre-0.4 formats are retired; old files are rejected.
 
+[0.7.1]: https://github.com/Keres-rs/keres/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Keres-rs/keres/compare/v0.5.0...v0.7.0
 [0.5.0]: https://github.com/Keres-rs/keres/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/Keres-rs/keres/compare/v0.4.1...v0.4.2
