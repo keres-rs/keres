@@ -28,13 +28,17 @@
 //! ```
 
 use std::fs;
-use std::io::Write as _;
+use std::io::{Read as _, Write as _};
 use std::path::{Path, PathBuf};
 
 use crate::crypto::{self, Key};
 use crate::error::{Error, Result};
 use crate::kdf::KdfParams;
 use crate::sanitize;
+
+/// Upper bound on accepted `vault.config` JSON, guarding against a hostile
+/// on-disk file forcing a huge allocation. Real configs are a few KiB.
+const MAX_CONFIG_LEN: u64 = 1024 * 1024;
 
 pub(crate) mod file_ops;
 pub(crate) mod index_log;
@@ -270,8 +274,14 @@ impl Vault {
     }
 
     fn load_config(&self) -> Result<VaultConfig> {
-        let json = fs::read_to_string(self.config_path())?;
-        VaultConfig::parse(&json)
+        let file = fs::File::open(self.config_path())?;
+        let mut bytes = Vec::new();
+        file.take(MAX_CONFIG_LEN + 1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_CONFIG_LEN {
+            return Err(Error::InvalidVault);
+        }
+        let json = std::str::from_utf8(&bytes).map_err(|_| Error::InvalidVault)?;
+        VaultConfig::parse(json)
     }
 
     /// Serializes and atomically replaces `vault.config`.
@@ -2033,5 +2043,22 @@ mod tests {
         assert_eq!(names, vec!["a.txt"]);
         assert!(!data.join(".index.compact").exists());
         assert!(!data.join(".index.snapshot.next").exists());
+    }
+
+    #[test]
+    fn oversized_config_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut vault = Vault::new(tmp.path().join("vault"));
+        vault.init("pw").unwrap();
+
+        // Replace the config with a hostile, oversized document. The reader
+        // must reject it on size alone instead of buffering the whole file.
+        let config = vault.path().join("vault.config");
+        let mut huge = vec![b' '; MAX_CONFIG_LEN as usize + 1];
+        huge.extend_from_slice(b"{}");
+        std::fs::write(&config, huge).unwrap();
+
+        let err = vault.keyslots().unwrap_err();
+        assert!(matches!(err, Error::InvalidVault));
     }
 }

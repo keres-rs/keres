@@ -28,6 +28,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The crate-level and `Vault` quick-start examples no longer call `unlock`
   immediately after `init` (which already leaves a new vault unlocked).
 
+### Security
+
+- Vault entry content-hash checks now compare digests in constant time.
+- Reads of `vault.config` are capped at 1 MiB, so a hostile on-disk file
+  cannot force a large allocation before parsing.
+- Clarified in the container documentation that the envelope version is bound
+  through the record AAD domain rather than key derivation; the tamper
+  property is unchanged.
+- The container fuzz target now exercises the v2 padding-header decoder
+  directly, which is otherwise gated behind a valid AEAD record.
+
 ## [0.7.1] - 2026-11-25
 
 This release contains no container-format, vault-format, or API changes.

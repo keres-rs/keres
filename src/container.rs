@@ -20,10 +20,12 @@
 //! [len u32][ct||tag]     authenticated trailer record
 //! ```
 //!
-//! All header bytes are bound to key derivation: flipping any of them
-//! yields a wrong key and authentication fails. The payload type is bound
-//! into every chunk and trailer AAD, so records cannot be transplanted
-//! between containers of different types.
+//! All header bytes are authenticated: the salts, KDF parameters and
+//! derivation kind feed key derivation, while the envelope version selects
+//! the record AAD domain. Flipping any header byte therefore makes
+//! authentication fail. The payload type is bound into every chunk and
+//! trailer AAD, so records cannot be transplanted between containers of
+//! different types.
 
 use std::io::{Read, Write};
 
@@ -274,7 +276,7 @@ impl PaddingHeader {
         out
     }
 
-    fn decode(bytes: &[u8]) -> Result<Self> {
+    pub(crate) fn decode(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != PADDING_HEADER_LEN {
             return Err(Error::MalformedPayload);
         }
