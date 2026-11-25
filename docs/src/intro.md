@@ -1,166 +1,82 @@
-# Introduction to Keres
+# Introduction
 
-A memory-safe Rust library and command-line tool for modern file encryption
-and secure vaults, using Argon2id and AES-256-GCM with encrypted filenames
-and a universal container format.
+Keres is a local-first encryption tool for files and directories. It ships as
+a library (`keres`) and a command-line program (`keres`), both built on the
+same container format and cryptographic core.
 
-Keres is built for modern security standards and currently in alpha phase therefore the public API may change in future and may break.
+Keres is designed around one rule: **do not release plaintext until its
+authenticity has been checked.** Every record is authenticated, and metadata
+is encrypted wherever the format can carry it.
 
-`keres` provides two complementary encrypted-
-storage modes over one shared cryptographic core:
+## Two modes, one format
 
-| Mode | Entry points | Use case |
-|---|---|---|
-| **Single-file** | `encrypt_file`, `decrypt_file` | Encrypt an individual file into a self-contained `.krs` container |
-| **Vault** | `Vault` struct | A directory holding many entries (files *and* directories) under one password, with an encrypted index |
+| Mode | Rust entry points | CLI commands | Use when |
+|---|---|---|---|
+| Single file | `encrypt_file`, `decrypt_file`, `encrypt_file_with_padding` | `keres encrypt`, `keres decrypt` | You need one self-contained `.krs` file |
+| Vault | `Vault` | `keres init`, `add`, `list`, `extract`, … | You need many files, directory trees, metadata protection, and password rotation |
 
-Both modes share:
+Both modes use the same authenticated container:
 
-- One universal wire format (`crates/keres/src/container.rs`) with a
-  stable magic and structured versioning.
-- One chunk engine (`crates/keres/src/stream.rs`, 64 KiB records).
-- One primitive layer (`crates/keres/src/crypto.rs`): AES-256-GCM,
-  Argon2id, HKDF-SHA256.
+- an 8-byte `KERES\0\0\0` magic;
+- a versioned envelope header;
+- 64 KiB AES-256-GCM chunk records;
+- an authenticated trailer that records the payload type, original name,
+  size, and chunk count.
 
-The crate is deliberately small: under 2k lines of library code, no async
-runtime, and no I/O beyond `std::fs`.
+Vaults add a key hierarchy, an encrypted index, keyslots, and crash-recovery
+journals on top of that container.
 
-```
-crates/keres/src/
-├── lib.rs          crate docs, prelude, re-exports
-├── error.rs        Error enum (thiserror), Result alias
-├── crypto.rs       AES-GCM / Argon2id / HKDF / CSPRNG wrappers
-├── kdf.rs          KdfParams: storage, validation bounds
-├── sanitize.rs     filename sanitization (traversal defense)
-├── fsutil.rs       atomic writes, permission restriction, fsync helpers
-├── stream.rs       chunk record writer/reader (format-agnostic)
-├── container.rs    universal envelope: header, key derivation, trailer
-├── single_file.rs  encrypt_file / decrypt_file
-└── vault/
-    ├── mod.rs      Vault state machine + public operations
-    ├── keystore.rs vault.config: KEK-wrapped master key
-    ├── manifest.rs encrypted BTreeMap index
-    └── file_ops.rs per-entry blob write/read/delete
-```
+## Design principles
 
----
+1. **Authenticate before use.** Chunk index and payload type are bound into
+   every AEAD tag. Headers participate in key derivation. A modified,
+   reordered, truncated, or transplanted ciphertext fails before plaintext is
+   returned.
+2. **Encrypt metadata where possible.** Filenames, directory structure, and
+   the vault index are encrypted. Exact sizes are not hidden by default;
+   opt-in padding rounds them to buckets.
+3. **Make crashes boring.** New data is written first and committed last.
+   Configs, indexes, and outputs use temp-file + `fsync` + `rename`. A crash
+   can lose the operation in flight, never the previous consistent state.
+4. **Keep the trusted surface small.** One container format, one chunk
+   engine, one error type, no async runtime, no network code, and no
+   `unsafe` (`#![forbid(unsafe_code)]`).
+5. **Separate passwords from data keys.** In a vault, the password derives a
+   key-encryption key that wraps a random master key. Changing a password
+   re-wraps that key; it does not rewrite stored ciphertext.
 
+## Project status
 
-## Design goals and threat model
+Keres is **pre-1.0**. The current line is 0.7.x.
 
-**Goals, in priority order:**
+- The wire format is versioned and covered by committed test vectors.
+- The public Rust API may change between minor releases until 1.0.
+- The project has not yet had an independent security audit.
+- Only the current container format is accepted. A 0.5.x vault can be
+  upgraded in place with `keres migrate`; other legacy formats must be
+  decrypted with the release that wrote them.
 
-1. Confidentiality of content and metadata (filenames are encrypted).
-2. Tamper *evidence*: any modification, truncation, reordering, splicing or
-   transplant of ciphertext must be detected before plaintext is released.
-3. No accidental data loss: corruption fails loudly; writes are atomic.
-4. Simplicity auditable by one person: few moving parts, no legacy paths.
+See [Security model](./security.md) for the threat model and a list of
+limitations that are deliberate, not bugs.
 
-**Adversaries considered:** local attacker with read access to disk;
-attacker with *write* access to stored files (tampering, swapping);
-network/sync-folder replication of damaged or rolled-back files.
+## Non-goals
 
-## Performance
+Keres does **not** try to provide:
 
-Measured with the CLI release build (rustc 1.97.1, x86_64, AES-NI),
-2026-08:
+- plausible deniability or hidden volumes;
+- protection against malware, keyloggers, or a compromised OS while a vault
+  is unlocked;
+- access-pattern hiding (ORAM) or exact entry-count hiding;
+- hardware-backed anti-rollback guarantees;
+- compatibility readers for retired formats.
 
-| Scenario | Time | Notes |
-|---|---|---|
-| Small file encrypt | **0.19 s** | dominated by Argon2id (64 MiB, t=4) — this floor *is* the brute-force defense; do not tune it down casually |
-| 200 MB encrypt | 0.56 s (~360 MB/s) | single thread |
-| 200 MB decrypt | 0.53 s (~380 MB/s) | roundtrip byte-identical |
-| Vault add, 200 files | 0.68 s | includes 201 Argon2-free blob writes after one unlock |
-| Vault list | 0.17 s | manifest-only, no blob I/O |
-| Vault verify, 201 entries | 0.18 s | full AEAD pass over every blob |
+## Where to go next
 
-### Analysis
-
-- Bulk throughput sits around 5–10 % of raw AES-NI ceiling. Costs: single
-  thread, 64 KiB chunks (allocation/GHASH overhead amortization), AAD
-  construction per record. Chunks are already independent — a rayon-style
-  parallel pipeline (roadmap 0.6.x) should scale near-linearly toward
-  GB/s without format changes.
-- Latency-sensitive UIs should batch: unlock once, add many. Per-vault-op
-  cost after unlock is essentially AES speed.
-- Verify is cheap relative to add because it skips KDF entirely (master
-  already unlocked).
-
----
-
-## Format versioning policy
-
-Rules that keep the ecosystem stable forever:
-
-1. The 8-byte magic **never changes**, including the NUL control byte.
-2. Envelope revisions bump the `u16` version field; readers reject unknown
-   versions with `UnsupportedVersion`. Released versions are readable
-   forever.
-3. A released `PayloadType` never changes meaning. New object kinds are
-   new types with new AAD contexts.
-4. Schema-bearing payloads (config v3, manifest v3) carry their own inner
-   version integers, checked after authentication.
-5. Only the current format is accepted. Any other magic returns
-   `IncompatibleFormat`; extract old data with the release that wrote it,
-   then re-add it. A 0.5.x vault manifest (v2) returns `MigrationRequired`
-   and is upgraded in place with `keres migrate`.
-
----
-
-## Public API tour
-
-Everything public hangs off four re-exported items plus modules:
-
-```rust
-use keres::{encrypt_file, decrypt_file, Vault};
-use std::path::Path;
-
-// Single file: encrypt, then decrypt back (name recovered from trailer).
-let out = encrypt_file("hunter2", Path::new("report.pdf"), None)?;
-let original_name = decrypt_file("hunter2", &out, Path::new("restored.pdf"))?;
-
-// Vault workflow.
-let mut vault = Vault::new(Path::new("myvault").to_path_buf());
-vault.init("hunter2")?;
-vault.unlock("hunter2")?;
-vault.add(Path::new("docs"), Some("docs"))?;
-for e in vault.list()? {
-    println!("{} {} bytes", e.name, e.size);
-}
-vault.extract("docs", Path::new("out"))?;
-vault.lock();
-```
-
-State machine: `init`/`unlock` require locked state; mutating operations
-require unlocked; `verify` takes the password explicitly (does not latch
-state). All fallible APIs return `Result` with the taxonomy above; no
-panics on hostile input (test-enforced).
-
-Module-level documentation in rustdoc mirrors this document; build with
-`cargo doc -p keres --open`.
-
----
-
-## Testing and quality gates
-
-Current suite (all green at time of writing):
-
-- **Unit, integration, and doc tests**: unit tests per module (crypto roundtrips/AAD binding,
-  container tamper matrix, stream limits, sanitize cases, manifest
-  truncation regression, vault lifecycle), integration tests
-  (`tests/single_file.rs`, `tests/vault.rs`) covering multi-MB roundtrips,
-  directory trees, password rotation and full-tamper sweeps.
-- Gates enforced locally and in CI: `cargo test`, `clippy -D warnings`,
-  `fmt --check`, `cargo doc` warning-free, `cargo publish --dry-run`.
-- GitHub Actions: test matrix (stable + MSRV 1.85), lint job, docs job,
-  publish-check; the workspace CI also builds the CLI and the docs book.
-
-Notable regression tests born from audits:
-
-- `truncated_manifest_is_an_error_not_an_empty_index` — protects against
-  silent index wipe-out.
-- `wrong_identity_rejected` — proves blob-transplant defense.
-- Tamper-everywhere sweeps flip each header/body/trailer byte region and
-  assert rejection.
-
----
+- [Installation](./install.md) — install the CLI or add the library.
+- [Quick start](./usage.md) — encrypt a file and create a vault.
+- [CLI guide](./cli-usage.md) — workflows and command behavior.
+- [Library guide](./library-usage.md) — API patterns and examples.
+- [Architecture](./architecture.md) — wire format, key hierarchy, and crash
+  safety.
+- [Security model](./security.md) — attacker model, guarantees, and
+  limitations.

@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-keres = { path = "../crates/keres" }
+keres = { path = ".." }
 
 [[bin]]
 name = "read_container"

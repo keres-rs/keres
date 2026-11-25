@@ -1,7 +1,10 @@
 # Contributing to Keres
 
-Thanks for helping. This repository is a single Cargo workspace containing
-the library, the CLI, and the documentation.
+Keres handles other people's data. Changes are reviewed with a bias toward
+correctness and explicit failure over convenience.
+
+The repository is one Cargo workspace: the `keres` library at the root, the
+`keres-cli` binary in `keres-cli/`, and the mdBook sources in `docs/`.
 
 ## Getting started
 
@@ -9,24 +12,11 @@ the library, the CLI, and the documentation.
 $ git clone https://github.com/Keres-rs/keres.git
 $ cd keres
 $ cargo test --workspace --all-targets
+$ cargo test --workspace --doc
 ```
 
-Optional but recommended:
-
-```console
-$ rustup component add clippy rustfmt
-$ nix develop            # if you use Nix; includes mdbook
-```
-
-## Layout
-
-- `crates/keres/` — the library. Container format, crypto primitives,
-  vault implementation, and integration tests.
-- `crates/keres-cli/` — the `keres` binary. Keep it a thin wrapper over
-  the library; business logic belongs in `keres`.
-- `docs/` — the mdBook sources. Build locally with `mdbook serve docs`.
-- `.github/workflows/` — CI, docs deployment, fuzzing, and the tag-driven
-  release pipeline.
+Rust 1.85 or newer is required. Nix users can run `nix develop` for a shell
+with the toolchain, clippy, rustfmt, rust-analyzer, and mdBook.
 
 ## Before opening a pull request
 
@@ -37,22 +27,67 @@ $ cargo fmt --all -- --check
 $ cargo clippy --workspace --all-targets -- -D warnings
 $ cargo test --workspace --all-targets
 $ cargo test --workspace --doc
-$ cargo deny check
 $ cargo doc --workspace --no-deps
+$ cargo deny check
 $ mdbook build docs
 ```
 
-## Guidelines
+`cargo deny check` requires `cargo-deny`; the policy is in `deny.toml`. Do not
+broaden the license allowlist without review.
 
-- Security first. Do not weaken an authenticated property for convenience.
-  If a change alters the format, key derivation, or AAD, document it and add
-  a regression test.
-- New public API needs rustdoc with an example. The crate denies missing
-  docs.
-- New behavior needs a test that would fail without the change.
-- Keep the container format backwards-compatible. New object kinds are new
-  payload types, never new magics.
-- Prefer small, focused commits with a clear rationale.
+## What a good change looks like
+
+- **Do not weaken an authenticated property for convenience.** Changes to the
+  container format, key derivation, or AAD need a written rationale and a
+  regression test.
+- **Fail loudly.** A damaged manifest, malformed header, or missing blob must
+  be an error. Never treat corruption as an empty vault.
+- **Test the failure path.** New behavior needs a test that fails without the
+  change. Crash-safety changes should state what happens at each commit point.
+- **Document public API.** The library denies missing docs and broken
+  intra-doc links.
+- **Keep the CLI thin.** Business logic belongs in the library.
+- **Respect the format.** New object kinds are new payload types with new AAD
+  contexts, never new magics or reused context strings.
+
+## Tests, fuzzing, and benchmarks
+
+```console
+$ cargo test -p keres
+$ cargo bench -p keres --bench throughput
+
+$ cd fuzz
+$ cargo fuzz run read_container
+$ cargo fuzz run parse_manifest
+$ cargo fuzz run parse_config
+$ cargo fuzz run sanitize
+```
+
+Fuzz targets use the nightly toolchain from `fuzz/rust-toolchain.toml`.
+
+Committed format fixtures live in `tests/vectors/`. A changed digest means the
+wire format changed; never regenerate a fixture just to make a test pass. See
+[Format test vectors](docs/src/test-vectors.md).
+
+## Documentation
+
+- Update the relevant page in `docs/src/` when behavior changes.
+- Use relative links between book pages. The root `README.md` is published to
+  crates.io, so it uses absolute repository and docs.rs links.
+- CLI examples should be runnable as written.
+- Keep normative format details in the architecture chapter; guides should
+  describe tasks.
+
+Build the book locally with `mdbook serve docs`. The writing conventions are
+in [docs/README.md](docs/README.md).
+
+## Commits and review
+
+- Keep commits focused and explain the why in the message.
+- Do not commit build output, vaults, or generated `.krs` files other than the
+  committed test vector.
+- Expect questions about failure modes, rollback behavior, and secret
+  handling.
 
 ## Releases
 
@@ -63,10 +98,11 @@ so maintainers do not need a long-lived registry token.
 
 ## Reporting bugs and vulnerabilities
 
-- Bugs and feature requests: open a GitHub issue with a minimal reproducer,
-  OS, Rust version, and the command or API call used.
-- Security issues: do **not** open a public issue. Follow
-  [SECURITY.md](SECURITY.md).
+Bugs and feature requests go to GitHub issues with a minimal reproducer, the
+operating system and Rust version, and the command or API call used.
+
+Do not open a public issue for a suspected vulnerability. Follow
+[SECURITY.md](SECURITY.md).
 
 ## License
 

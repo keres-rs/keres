@@ -1,93 +1,85 @@
-# Release Notes
+# Release process
 
-## Releasing
+Keres uses tag-driven releases. The workflow in
+`.github/workflows/release.yml` publishes the crates, builds binary archives,
+and creates the GitHub release.
 
-Releases are tag-driven. `.github/workflows/release.yml` runs when a `v*` tag
-is pushed (or manually via **Run workflow**) and:
+## Versioning
 
-1. Verifies the tag is on `main` and matches the workspace version in
-   `Cargo.toml`.
+- The workspace version lives in `Cargo.toml` under
+  `[workspace.package]`.
+- `keres` and `keres-cli` share that version.
+- The CLI depends on the matching published `keres` version, so the library
+  must be published first.
+- The container format version is independent of the crate version. Format
+  compatibility is documented in
+  [Compatibility and versioning](./architecture.md#compatibility-and-versioning).
+
+## Release checklist
+
+1. **Update the version.** Bump `[workspace.package].version` and run
+   `cargo update --workspace` if needed.
+2. **Update the changelog.** Add an entry to `CHANGELOG.md` describing user
+   impact, format changes, and upgrade notes.
+3. **Run the gates.**
+
+   ```console
+   $ cargo test --workspace --all-targets --locked
+   $ cargo test --workspace --doc --locked
+   $ cargo clippy --workspace --all-targets --locked -- -D warnings
+   $ cargo fmt --all -- --check
+   $ cargo doc --workspace --no-deps --locked
+   $ cargo publish --dry-run --locked -p keres
+   $ mdbook build docs
+   ```
+
+4. **Commit the release.** The release workflow requires the tag to be on
+   `main`.
+5. **Tag and push.**
+
+   ```console
+   $ git tag v0.7.1
+   $ git push origin v0.7.1
+   ```
+
+6. **Approve the deployment.** The workflow uses the protected `release`
+   environment; a reviewer must approve before publishing.
+
+## What the workflow does
+
+1. Verifies the tag is an ancestor of `main` and matches the workspace
+   version.
 2. Runs `cargo test --workspace --locked`.
-3. Publishes `keres` and then `keres-cli` to crates.io, waiting for the index
-   to expose the library before the CLI.
-4. Builds `keres` for Linux (x86_64), macOS (aarch64), and Windows (x86_64),
-   packages each archive with a SHA-256 file, and attests build provenance.
-5. Creates the GitHub Release and attaches the archives and checksums.
+3. Publishes `keres`, waits for the crate to appear on crates.io, then
+   publishes `keres-cli`.
+4. Builds the CLI for Linux (`x86_64-unknown-linux-gnu`), macOS
+   (`aarch64-apple-darwin`), and Windows (`x86_64-pc-windows-msvc`).
+5. Packages each binary with a SHA-256 checksum and build-provenance
+   attestation.
+6. Creates the GitHub release and attaches the archives and checksums.
 
-```console
-$ git tag v0.6.0
-$ git push origin v0.6.0
-```
+The publish step is idempotent: a version already present on crates.io is
+skipped, so a failed release can be re-run from the same tag. The CLI publish
+retries while the registry index catches up.
 
-One-time repository setup:
+## One-time repository setup
 
-- On crates.io, configure **Trusted Publishing** for both `keres` and
+- Configure **Trusted Publishing** on crates.io for both `keres` and
   `keres-cli`, pointing at `Keres-rs/keres` and
   `.github/workflows/release.yml`.
-- Create a `release` **environment** in GitHub with required reviewers, so a
-  publish cannot happen without approval.
-- Ensure the workflow's `id-token: write` / `attestations: write` permissions
-  are allowed by the repository's Actions policy.
+- Create a `release` environment in GitHub with required reviewers.
+- Allow `id-token: write` and `attestations: write` in the repository's
+  Actions policy.
 
-The workflow is idempotent: if a crate version is already on crates.io it is
-skipped, so a failed release can be re-run from the same tag. `keres-cli`
-cannot be published before the matching `keres` version is live.
+## Supported versions
 
-## 0.6.0 (unreleased)
+Keres is pre-1.0. Security fixes are applied to the latest published release
+(currently the 0.7.x line). Only the current container format is supported;
+legacy formats must be decrypted with the release that wrote them. A 0.5.x
+vault can be upgraded in place with `keres migrate`.
 
-- Added committed format test vectors, `cargo-fuzz` targets, and Criterion
-  benchmarks.
-- Added `Vault::replace` and `Vault::prune_orphans` (`keres replace`,
-  `keres verify --prune`).
-- Added `Vault::rename` and stable random entry IDs (manifest v3), so renames
-  no longer re-encrypt data and blob identity is independent of the path.
-- Added `--password-file`, `--password-stdin`, `--force`, and remove
-  confirmation to the CLI, with zeroized password buffers.
-- Added `.github/workflows/release.yml`: tag-driven crates.io publishing
-  (library before CLI, Trusted Publishing), cross-platform binary archives,
-  SHA-256 checksums, build-provenance attestations, and a GitHub Release.
-- CI now runs doctests and `cargo-deny`, and the MSRV is 1.85.
-- **Upgrade note:** vaults written by 0.5.0 use manifest v2 and are rejected
-  by the 0.6.0 reader. Back up the vault directory, then run
-  `keres migrate <vault>`. Migration re-encrypts each entry in place, keeps
-  the same password, commits the v3 manifest atomically, and removes the
-  legacy blobs. It is one-way; verify the upgraded vault before deleting the
-  backup.
+## Release notes
 
-## 0.5.0
-
-- Consolidated the library, CLI, and documentation into one Cargo workspace.
-- Renamed the project from Krypton to Keres: library `keres`, CLI package
-  `keres-cli`, binary `keres`, and `.krs` single-file containers.
-- Added advisory vault locking: writers take an exclusive lock, readers a
-  shared one, and concurrent access returns `Error::VaultBusy`.
-- Added workspace-wide CI for tests on Linux, Windows, and macOS, plus
-  linting, rustdoc, package dry-runs, and the mdBook build.
-- Added root `CONTRIBUTING.md`, `SECURITY.md`, `ROADMAP.md`, and
-  `CHANGELOG.md`.
-- Hardened temp-file creation: files are created with `O_CREAT | O_EXCL`
-  and mode `0600` (Unix) up front, so plaintext is never briefly readable
-  by other users and a planted symlink cannot redirect a write.
-
-## 0.4.2
-
-- Renamed the crates.io package to `krypton-core` while keeping the library
-  name `krypton`.
-- Updated repository metadata.
-
-## 0.4.1
-
-- Version bump and lockfile update.
-
-## 0.4.0
-
-- Introduced the universal container format shared by `.krf` files, vault
-  blobs, and manifests.
-- Added Argon2id parameters stored in each container.
-- Added per-object HKDF subkeys, counter nonces, and AAD binding.
-- Added `Vault::verify`.
-- Added crash-safe atomic writes.
-- Retired pre-0.4 formats.
-
-See [CHANGELOG.md](https://github.com/Keres-rs/keres/blob/main/CHANGELOG.md)
-for the full history.
+`CHANGELOG.md` is the source of truth for user-visible changes. The GitHub
+release should summarize upgrade notes and link to the changelog rather than
+duplicating it.

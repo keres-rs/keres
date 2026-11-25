@@ -1,228 +1,240 @@
-# Threat Model
+# Security model
 
-Keres protects **data at rest** against an adversary with read access to the
-storage medium: stolen laptops, leaked cloud backups, seized disks. The
-adversary may also attempt to modify stored ciphertext.
+Keres protects data **at rest**. The primary adversary has read access to the
+storage medium — a stolen laptop, a leaked backup, a seized disk, or a
+compromised sync folder — and may also modify stored files.
 
-Out of scope: malware on the user's machine while a vault is unlocked,
-keyloggers, compromised OS, side channels on the CPU (e.g. Rowhammer),
-and coercion of the password itself.
+Keres does not protect against an attacker who can run code on the machine
+while a vault is unlocked, observe the screen or keyboard, or control the
+operating system. Those cases are outside the threat model.
 
-## Cryptographic Design
+> **Audit status:** Keres has not yet had an independent security audit. This
+> document describes the intended design and the properties the test suite
+> checks; it is not a substitute for review before high-value deployment.
 
-    | Primitive | Role |
-    |---|---|
-    | AES-256-GCM | AEAD for all ciphertext (chunks, trailers, manifests, index-log records, wrapped keys) |
-    | Argon2id (64 MiB, t=4, p=4) | Password → KEK; parameters serialized per container |
-    | HKDF-SHA256 | Master key → per-object subkeys; manifest and index-log key derivation |
-    | SHA-256 | Blob path derivation (`SHA256(master ‖ entry_id)`), per-entry plaintext content hash, verification hash |
+## Security goals
 
-### Nonces
+In priority order:
 
-- **Single-file / vault entries:** 12-byte nonce = `0x0000_0000 ‖ chunk_index (u64 BE)`
-  under an HKDF subkey unique to the object and its salt. Counter nonces are
-  collision-free within an object regardless of size or restarts.
-- **Trailer:** reserved all-`0xFF` nonce, distinct domain from data chunks.
-- **Manifest snapshot:** container chunk nonces under an HKDF subkey with a
-  fresh random `object_salt` on every save.
-- **Config / recovery wrap:** a fresh random 96-bit nonce for every wrapping
-  operation, under a KEK derived from that slot's own random salt.
-- **Index log:** a fresh random 96-bit nonce per record under an HKDF subkey
-  derived from the master and a random per-log `log_id`. The AAD binds the
-  authenticated log header and the record index, so records cannot be
-  reordered, spliced between logs, or replayed under another generation. The
-  header is also bound to the exact snapshot hash and the snapshot's
-  authenticated internal generation.
+1. **Confidentiality of content and metadata.** File contents, names, and
+   directory structure are encrypted.
+2. **Tamper evidence.** Modification, truncation, reordering, splicing, or
+   transplantation of ciphertext is detected before plaintext is released.
+3. **No accidental data loss.** Corruption fails loudly; writes are atomic;
+   interrupted operations never leave a half-written config or a dangling
+   index.
+4. **A small, auditable surface.** One container format, one chunk engine,
+   no async runtime, no network code, and no `unsafe`
+   (`#![forbid(unsafe_code)]`).
 
-### Associated Data
+## Cryptographic primitives
 
-Every AEAD operation binds the container's payload-type context
-(`"keres-container-v1/file"`, …) plus the chunk index, and the trailer
-additionally binds a `/trailer` suffix. Consequences:
+All primitives come from RustCrypto crates (`aes-gcm`, `argon2`, `hkdf`,
+`sha2`, `subtle`). Randomness comes from the operating system CSPRNG.
 
-- Reordering chunks between positions → authentication failure.
-- Truncating the file → detected by trailer cross-check of `size`/`chunk_count`.
-- Moving bytes between two `.krs` files (same password!) → fails because each
-  container derives an independent object salt/subkey.
-- The unauthenticated end-of-chunks marker cannot be exploited: the trailer is
-  authenticated and its `chunk_count` must match exactly what preceded it.
+| Primitive | Parameters | Role |
+|---|---|---|
+| AES-256-GCM | 96-bit nonces, 128-bit tags | Every byte of ciphertext |
+| Argon2id | Default 64 MiB, t=4, p=4; stored per container | Password → key-encryption key |
+| HKDF-SHA256 | Random 32-byte salt per object | Master key → per-object content keys; index-log keys |
+| SHA-256 | — | Blob path derivation and per-entry plaintext content hashes |
+| `subtle::ConstantTimeEq` | — | Comparisons on secrets where needed |
 
-### Key Hierarchy
+KDF parameters travel inside containers so defaults can evolve. When reading
+untrusted input they are bounded to prevent denial of service:
 
+| Field | Default | Accepted range |
+|---|---|---|
+| `m_cost_kib` | 65,536 KiB (64 MiB) | 8 MiB – 4 GiB |
+| `t_cost` | 4 | 1 – 64 |
+| `p_cost` | 4 | 1 – 16 |
+
+## Key hierarchy
+
+```text
+Standalone .krs (password-derived):
+
+  password ──Argon2id(argon_salt, params)──► KEK
+           ──HKDF(object_salt)──► content key
+
+Vault:
+
+  password ──Argon2id(slot salt, params)──► KEK
+           ──AES-GCM-wrap──► master key (vault.config, one wrapping per keyslot)
+
+  master key ──HKDF(object_salt, identity)──► per-entry content key
+             ──HKDF(object_salt, "vault-manifest")──► index content key
 ```
-password ─Argon2id─► KEK ─wrap─► master key (vault.config)
-                                    ├─► HKDF subkeys per entry blob
-                                    ├─► HKDF manifest snapshot key
-                                    └─► HKDF index-log key (per log_id)
-```
 
-`change_password` re-wraps only the matching keyslot; no re-encryption of data.
-`rotate` generates a new master key and re-encrypts the current entries, but no
-rotation can invalidate ciphertext copies an attacker has already
-exfiltrated.
+Properties that follow:
 
-## Memory Handling
+- **Per-object keys.** Every entry gets a fresh random object salt and an
+  independent HKDF subkey.
+- **Password changes do not rewrite data.** Only the wrapped master key in
+  `vault.config` changes.
+- **No offline verifier.** There is no password hash to check guesses against;
+  each guess costs a full Argon2id run plus GCM verification.
+- **Keyslot revocation is not rotation.** Removing a slot drops one wrapping;
+  the master key stays the same. See [Known limitations](#known-limitations).
 
-- All keys are held in `Zeroizing<[u8; 32]>`; buffers are zeroized on drop.
-- Keys are never copied by value into logs, errors, or serialization.
-- The crate is compiled with `#![forbid(unsafe_code)]`; we do not use mlock
-  or core-dump suppression (see Limitations).
+## Nonces and associated data
 
-## Filesystem Hardening
+| Record | Nonce | AAD |
+|---|---|---|
+| Data chunk *i* | 4 zero bytes ‖ `i` as u64 BE | `"keres-container-v1/<type>"` ‖ chunk index |
+| Padded metadata | `[0xFE; 12]` | `"keres-container-v2/padding"` |
+| Trailer | `[0xFF; 12]` | chunk context ‖ index ‖ `"/trailer"` |
+| Config slot | Random 96-bit nonce | `"keres-vault-config-v3/"` ‖ slot id |
+| Recovery kit | Random 96-bit nonce | `"keres-vault-recovery-v1"` |
+| Index-log record | Random 96-bit nonce | log header bytes ‖ record index |
 
-- Atomic writes: temp file in the same directory + `fsync` + `rename`, so a
-  crash mid-write can never corrupt a vault config, snapshot, or journal.
-- The index log is the only append-in-place file. It is record-framed and
-  each batch is written with one `write_all` + `sync_data`; a torn final
-  record is detected and truncated on the next write, while damage earlier in
-  the log is reported as an authentication failure.
-- Temp files are opened with `O_CREAT | O_EXCL`, so a path that already
-  exists — including a planted symlink — makes the operation fail rather
-  than being written through. On Unix they are mode `0600` from creation.
-- Vault directories and `.krs` outputs are created with mode `0700`/`0600`
-  on Unix.
-- Names read back from containers are sanitized before path joins;
-  absolute paths, `..`, separators and control characters are rejected —
-  a malicious vault archive cannot write outside its directory.
-- Removal commits the index first and deletes blobs afterwards. A crash or
-  deletion failure between the two leaves unreferenced blobs (reclaimed by
-  `prune_orphans`), never an index pointing at missing data.
-- Vault access is serialized with an advisory lock on `vault.lock`: writers
-  take it exclusively, readers share it, and a contended operation returns
-  `Error::VaultBusy`. The lock is not a security boundary against a process
-  that deliberately ignores it.
+Consequences:
 
-## Format Versioning Policy
+- Reordering chunks or moving records between positions fails authentication.
+- Moving records between payload types or containers fails because the
+  context or object key differs.
+- The unauthenticated end-of-chunks marker is harmless: the authenticated
+  trailer's `chunk_count` and `size` must match what was actually read.
+- Counter nonces are collision-free within an object regardless of size or
+  restarts.
 
-Since 0.4, all objects use one universal container: an 8-byte magic
-(`KERES\0\0\0`, with a control byte so it can never occur in plain text),
-a u16 envelope version, a key-derivation kind byte (HKDF-from-master for
-vault objects, Argon2id password for standalone files), chunk records and
-an authenticated trailer carrying the payload type (`file`, `directory`,
-`manifest`).
+See [Architecture](./architecture.md) for the exact wire layout.
 
-Rules that keep this stable:
+## Key management
 
-1. Every container writes the `KERES\0\0\0` magic. Envelope revisions bump
-   the version field; readers reject unknown versions with
-   `UnsupportedVersion`.
-2. A released payload type never changes meaning; new object kinds are
-   new trailer types with new context strings.
-3. Only the current Keres format is accepted. Any other magic returns
-   `Error::IncompatibleFormat`; extract old data with the release that wrote
-   it before upgrading. Vault manifests are the exception: a 0.5.x (manifest
-   v2) vault returns `MigrationRequired` and is upgraded in place by
-   `keres migrate` / `Vault::migrate`.
-4. Vault directories are forward-only. Since 0.7 a vault may contain an
-   append-only `d/.index.log`; pre-0.7 releases do not know about it and can
-   silently show or write a stale index. Do not alternate releases on the
-   same vault directory.
+### Passwords and keyslots
 
-## Verification API
+A vault starts with one keyslot. Each slot wraps the same random master key
+under a KEK derived from that slot's password and salt. Unlocking tries the
+slots until one AEAD tag verifies.
 
-`Vault::verify()` authenticates every blob and the replayed index (snapshot
-plus log), reporting a per-entry integrity report without writing plaintext to
-disk. Beyond AEAD tags it checks the plaintext size and the SHA-256 content
-hash recorded in the authenticated index, so a storage attacker cannot swap in
-an older valid blob for the same entry ID. Entries written by releases before
-content hashes existed are size-checked only.
+`change_password` re-wraps one slot. `add_keyslot` appends a new wrapping.
+`remove_keyslot` deletes a wrapping and requires authorization from a slot
+that remains; the last slot cannot be removed.
 
-## Recovery Kit
+Slot ids and the slot count are plaintext metadata in `vault.config`. A wrong
+password and a tampered wrapping are both reported as
+`Error::Authentication`.
 
-`Vault::create_recovery_kit()` writes a second wrapping of the master key to
-`vault.recovery`, protected by a random 160-bit code printed once as Crockford
-Base32 with a 16-bit checksum. Neither the code nor the master key is stored in
-plaintext. `Vault::recover()` can recreate a lost or corrupt `vault.config`
-after validating the recovered key against the encrypted index, then consumes
-the kit so the code cannot be replayed.
+### Recovery kits
 
-For an attacker who steals the vault directory, the recovery file is a second
-offline guessing target; 160 bits plus Argon2id makes exhaustive search
-infeasible. The code must still be stored separately and handled like the
-vault itself. Creating a new kit replaces the old wrapping; losing both the
-code and the password remains unrecoverable.
+A recovery kit is an independent wrapping of the master key under a random
+160-bit code, printed once. `recover` uses the kit to recreate a lost or
+damaged `vault.config`, validates the recovered key against the encrypted
+index, writes a fresh single-slot config, and deletes the kit.
 
-## Keyslots
+The code is not stored. The recovery file is a second offline guessing target;
+160 bits plus Argon2id makes exhaustive search infeasible, but the code must
+be stored separately and handled like a password.
 
-`vault.config` version 3 stores independent keyslots, each wrapping the same
-master key under its own Argon2id-derived KEK. Passphrases are never stored or
-compared to each other; unlocking derives a KEK per slot and succeeds when one
-AEAD tag verifies. Changing a password re-wraps one slot. Adding a slot does
-not alter ciphertext. Removing a slot drops that wrapping and revokes the
-passphrase.
+### Rotation and erasure
 
-Revocation is not key rotation: the master key stays the same. An attacker who
-had already used the revoked passphrase to unwrap the master key keeps access
-to the ciphertext until the vault is deeply rotated or rebuilt. Revoking a
-keyslot is therefore a control for lost devices and role changes, not a
-remedy for a key that may have leaked. For that case, `Vault::rotate` /
-`keres rotate` re-encrypts every entry under a fresh master key; it is
-deliberately slow, collapses the vault to one keyslot under the new password,
-and removes any recovery kit.
+`rotate` generates a new master key, re-encrypts every entry, and writes a
+fresh single-slot config. `erase` does the same while omitting one entry.
 
-Malformed slots fail closed with `InvalidVault`; a wrong passphrase across all
-slots is indistinguishable from a tampered wrapping (`Authentication`). Slot
-ids and the slot count are plaintext metadata in `vault.config`.
+Both are forward-looking. They stop old key material from working against the
+vault from now on, but they cannot revoke ciphertext that an attacker already
+copied together with the old key or config.
 
-## Known Limitations
+## Memory handling
 
-1. **No memory locking** — with `forbid(unsafe_code)` we cannot call
-   `mlock`; unlocked keys may hit swap if the system has no encrypted swap.
-2. **No automatic key rotation of content** — changing the password re-wraps
-   the master key but old ciphertext snapshots remain decryptable with the
-   old password forever. Deep rotation (`Vault::rotate`) re-encrypts the
-   current vault under a fresh master key, but cannot reach snapshots an
-   attacker already copied.
-3. **No deniability** — format magics and structure identify files as
-   Keres containers.
-4. **Single-factor** — no hardware-token or multi-party key splitting.
-5. **Filename leakage via size** — plaintext lengths are visible through
-   ciphertext length *unless* size padding is enabled, in which case only
-   the bucket is revealed. Padding is opt-in (`Vault::padding` / `set_padding`,
-   `encrypt_file_with_padding` / CLI `--padding`); L1 remains the default.
-6. **Trust on first unlock** — the config stores a verification hash rather
-   than a signature; there is no protection against full-storage rollback to
-   an older valid vault snapshot. The index's internal generation makes
-   snapshot/log swaps unambiguous, and per-entry content hashes detect a
-   substituted blob for the same entry, but neither is a hardware-backed
-   anti-rollback counter. Truncating the tail of the index log is likewise
-   indistinguishable from an interrupted append.
-7. **Operation-pattern leakage** — the index log's record count, size, and
-   approximate write order reveal how many mutations happened and roughly
-   when. Entry sizes may be bucketed when padding is enabled, but access
-   patterns and exact counts are not hidden.
+- Keys live in `Zeroizing<[u8; 32]>`; buffers containing secrets are zeroized
+  on drop.
+- `Debug` for `Key` and `RecoveryCode` redacts the value.
+- Keys are not serialized, logged, or included in errors.
+- `Vault::lock` drops the in-memory master key.
 
-## Metadata leakage matrix
+Keres does **not** use `mlock`, `madvise`, or core-dump suppression. With
+`#![forbid(unsafe_code)]`, those would require an audited unsafe boundary;
+they are on the roadmap. On a machine without encrypted swap, unlocked keys
+can reach disk.
 
-What a storage-level observer (someone who can read the vault directory and
-measure file sizes and mtimes, but not decrypt) can learn, and which
-mitigations apply. "L1" is the default; "L2+" requires opt-in padding and
-the caveats below.
+## Filesystem and crash safety
 
-| Signal | L1 (default) | L2+ (opt-in padding) | Notes |
+- All persistent writes use: create a temp file in the same directory →
+  restrict permissions → write → `sync_all` → `rename` → `sync_dir`.
+- Temp files are opened with `O_CREAT | O_EXCL`, so an existing path or
+  planted symlink causes failure instead of being written through. On Unix
+  they are mode `0600` from creation.
+- Vault directories and single-file outputs are created with owner-only
+  permissions (`0700`/`0600`) on Unix.
+- Names recovered from containers are sanitized before path joins. Absolute
+  paths, `..`, separators, and control characters are rejected.
+- Adds write blobs first and commit the index last. A crash leaves
+  unreferenced blobs, never an index pointing at missing data.
+- Removals commit the index first and delete blobs afterwards. A failed
+  deletion leaves a pruneable orphan.
+- Replaces are copy-on-write: a new blob and entry ID are written, the index
+  is committed, and only then is the old blob deleted.
+- Rotation and index compaction are journaled; the next lock acquisition
+  completes or rolls back an interrupted run.
+- Vault access uses non-blocking advisory locks (`flock` on Unix,
+  `LockFileEx` on Windows). Writers lock exclusively, readers share the lock,
+  and contention returns `Error::VaultBusy`.
+
+The lock coordinates well-behaved processes; it is not a security boundary.
+
+## Metadata leakage
+
+Keres uses two informal levels in its documentation:
+
+- **Default** — names and structure encrypted; exact entry sizes visible.
+- **Padded** — opt-in size padding (`Padding::Adaptive` or `Padding::Fixed`).
+
+| Signal | Default | Padded | Notes |
 |---|---|---|---|
-| Container magic / format existence | Visible | Visible | Keres magic is not hidden; deniability is out of scope. |
-| Vault existence | Visible | Visible | Directory layout identifies a vault. |
-| Number of top-level entries | Visible | Visible (coarse) | Manifest size hints at count; count bucketing is deferred. |
-| Entry sizes | Exact (64 KiB granularity) | Bucket only | Requires `Padding != None`; manifests/dirs unpadded. |
-| File names | Hidden | Hidden | Always encrypted in the index. |
-| Directory structure | Hidden | Hidden | Encrypted in the index. |
-| Access patterns (read/write order, frequency) | Visible | Visible | Not hidden; needs ORAM (out of scope). |
-| Modification times | OS-level (visible) | OS-level (visible) | Not coarsened. |
-| Index mutation count / order | Visible via log size | Visible via log size | Group commit (timing coarsening) is future work. |
-| Deleted-entry recoverability | Blob removed on `remove` | Blob removed; old copies decryptable unless `erase` | `erase` rotates the master key (forward invalidation, not retroactive). |
-| Rollback to older snapshot | Possible (no signatures) | Possible | Hardware-backed counter is optional/future. |
+| Container magic / format existence | Visible | Visible | Deniability is out of scope |
+| Vault existence and layout | Visible | Visible | Directory names and structure identify a vault |
+| File names | Hidden | Hidden | Encrypted in the index or trailer |
+| Directory structure | Hidden | Hidden | Encrypted in the index |
+| Entry sizes | Exact | Bucket only | Manifests and directory placeholders are never padded |
+| Number of top-level entries | Visible | Visible (coarse) | Count bucketing is not implemented |
+| Access patterns | Visible | Visible | No ORAM; reads/writes and timing are observable |
+| Modification times | OS-level | OS-level | Not coarsened |
+| Index mutation count / order | Visible via log size | Visible via log size | Group commit and timing jitter are future work |
+| Deleted-entry recoverability | Blob removed | Blob removed | Old copies remain decryptable unless `erase` is used |
+| Rollback to an older valid copy | Possible | Possible | No hardware-backed anti-rollback counter |
 
-### Caveats
+Padding hides exact sizes, not which blob was accessed or when. It also adds
+storage overhead: adaptive padding wastes up to the current bucket size.
 
-- Padding hides the exact size, not the access pattern. An observer who sees
-  *which* blob is read still learns which entry was used.
-- `remove` drops the blob and index record but leaves the data decryptable by
-  anyone holding an old master key or snapshot. `Vault::erase` omits the entry
-  and rotates the master key in one journaled commit, so the old key stops
-  working against the vault from then on. This is forward-looking: it cannot
-  revoke a copy of the deleted blob that an attacker already captured together
-  with the old key material.
-- Group commit and timing jitter are not yet implemented; mutations are
-  flushed per save.
+## Verification
 
+`Vault::verify` / `keres verify` authenticates the replayed index and every
+blob. In addition to AEAD tags it checks:
+
+- the payload type;
+- the recorded plaintext size;
+- the SHA-256 content hash stored in the authenticated index.
+
+The content hash detects a substituted older blob under the same entry ID.
+Entries written by releases before content hashes existed are size-checked
+only. Verification does not detect a rollback of the entire vault directory.
+
+## Known limitations
+
+1. **No memory locking.** Keys can be swapped or captured in a core dump if
+   the OS allows it.
+2. **No retroactive key rotation.** Rotation re-encrypts the current vault,
+   but cannot reach copies an attacker already took.
+3. **No deniability.** The container magic and vault layout identify their
+   contents as Keres data.
+4. **Single-factor authentication.** Passwords, keyslots, and recovery codes
+   are all knowledge factors. There is no hardware token or multi-party
+   split.
+5. **Size leakage by default.** Ciphertext length reveals plaintext length
+   unless padding is enabled. Padding is opt-in.
+6. **No hardware-backed anti-rollback.** Restoring an older valid vault
+   directory is possible. Content hashes and index generations detect some
+   local substitutions, not a full-directory rollback. A truncated index-log
+   tail is indistinguishable from an interrupted append.
+7. **Operation-pattern leakage.** The index log reveals how many mutations
+   occurred and roughly when. Access patterns are not hidden.
+8. **No independent audit.** The implementation has not been reviewed by an
+   external cryptography or security firm.
+
+## Reporting a vulnerability
+
+Do not open a public issue for a suspected vulnerability. Follow the process
+in [SECURITY.md](https://github.com/Keres-rs/keres/blob/main/SECURITY.md),
+including a minimal reproducer and the affected version.
