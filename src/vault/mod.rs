@@ -33,6 +33,7 @@ use std::path::{Path, PathBuf};
 
 use crate::crypto::{self, Key};
 use crate::error::{Error, Result};
+use crate::kdf::KdfParams;
 use crate::sanitize;
 
 pub(crate) mod file_ops;
@@ -54,6 +55,65 @@ use keystore::{KeyStore, VaultConfig};
 use lock::VaultLock;
 use manifest::{EntryMetadata, ManifestMap};
 
+/// Options for creating a new vault.
+///
+/// The defaults match [`Vault::init`]: no size padding and the library's
+/// standard Argon2id parameters. Use [`Vault::init_with_options`] to choose a
+/// different cost, for example a lower memory budget on a memory-constrained
+/// device.
+///
+/// ```no_run
+/// use keres::{KdfParams, Padding, Vault, VaultOptions};
+///
+/// let mut vault = Vault::new("secrets".into());
+/// vault.init_with_options(
+///     "correct horse",
+///     VaultOptions::new()
+///         .padding(Padding::Adaptive)
+///         .kdf(KdfParams {
+///             m_cost_kib: 32 * 1024,
+///             t_cost: 3,
+///             p_cost: 2,
+///         }),
+/// )?;
+/// # Ok::<(), keres::Error>(())
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VaultOptions {
+    /// Size-padding policy for new entries. Defaults to [`crate::padding::Padding::None`].
+    pub padding: crate::padding::Padding,
+    /// Argon2id parameters for the initial keyslot. Defaults to [`KdfParams::new`].
+    pub kdf: KdfParams,
+}
+
+impl Default for VaultOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl VaultOptions {
+    /// No padding and the standard Argon2id parameters.
+    pub const fn new() -> Self {
+        Self {
+            padding: crate::padding::Padding::None,
+            kdf: KdfParams::new(),
+        }
+    }
+
+    /// Sets the size-padding policy.
+    pub const fn padding(mut self, padding: crate::padding::Padding) -> Self {
+        self.padding = padding;
+        self
+    }
+
+    /// Sets the Argon2id parameters.
+    pub const fn kdf(mut self, kdf: KdfParams) -> Self {
+        self.kdf = kdf;
+        self
+    }
+}
+
 /// A handle to an on-disk encrypted vault.
 ///
 /// Operations follow an explicit lock/unlock protocol: [`Vault::unlock`]
@@ -68,11 +128,13 @@ use manifest::{EntryMetadata, ManifestMap};
 ///
 /// let mut vault = Vault::new("myvault".into());
 ///
-/// // First run: create the vault (fails if it already exists).
-/// if !vault.exists() {
+/// // First run: create the vault (fails if it already exists). `init`
+/// // leaves the new vault unlocked.
+/// if vault.exists() {
+///     vault.unlock("correct horse battery staple")?;
+/// } else {
 ///     vault.init("correct horse battery staple")?;
 /// }
-/// vault.unlock("correct horse battery staple")?;
 ///
 /// // Store a file and a whole directory tree.
 /// vault.add(Path::new("report.pdf"), None)?;          // stored as "report.pdf"
@@ -229,7 +291,7 @@ impl Vault {
     /// # Ok::<(), keres::Error>(())
     /// ```
     pub fn init(&mut self, password: &str) -> Result<()> {
-        self.init_with_padding(password, crate::padding::Padding::None)
+        self.init_with_options(password, VaultOptions::new())
     }
 
     /// Initializes a new vault with a custom size-padding policy.
@@ -242,7 +304,17 @@ impl Vault {
         password: &str,
         padding: crate::padding::Padding,
     ) -> Result<()> {
-        padding.validate()?;
+        self.init_with_options(password, VaultOptions::new().padding(padding))
+    }
+
+    /// Initializes a new vault with explicit options.
+    ///
+    /// This is the general form of [`Vault::init`]. The KDF parameters are
+    /// stored in the initial keyslot and inherited by keyslots added or
+    /// re-wrapped later, so the vault keeps the cost chosen here.
+    pub fn init_with_options(&mut self, password: &str, options: VaultOptions) -> Result<()> {
+        options.padding.validate()?;
+        options.kdf.validate()?;
         if self.exists() {
             return Err(Error::VaultExists);
         }
@@ -268,11 +340,11 @@ impl Vault {
             return Err(Error::VaultExists);
         }
 
-        let config = self.keystore.init(password)?;
+        let config = self.keystore.init(password, options.kdf)?;
         // Write the index before the config. A crash in between leaves no
         // config, so `init` can be retried safely; the reverse order would
         // leave an initialized-looking vault whose index is missing.
-        manifest::init(&self.path, self.keystore.master_key()?, padding)?;
+        manifest::init(&self.path, self.keystore.master_key()?, options.padding)?;
         self.write_config(&config)?;
         Ok(())
     }
@@ -652,6 +724,183 @@ impl Vault {
         Ok(())
     }
 
+    /// Adds a top-level file entry from an arbitrary [`std::io::Read`] source.
+    ///
+    /// This is the streaming counterpart to [`Vault::add`] for applications
+    /// that already hold bytes in memory, receive them over a network, or
+    /// read them from another storage system. `name` must be a single path
+    /// component, matching [`Vault::add`]. The reader is consumed to EOF and
+    /// its plaintext is hashed while it is encrypted.
+    ///
+    /// `len` must be the exact number of plaintext bytes the reader will
+    /// yield when the vault uses size padding ([`Vault::init_with_options`]);
+    /// padding must be computed before any data is read. For unpadded vaults
+    /// pass `None` to stream without knowing the size in advance.
+    ///
+    /// The blob is committed before the index, so a failure can leave an
+    /// unreferenced blob (reclaimable with [`Vault::prune_orphans`]) but never
+    /// a dangling index record.
+    ///
+    /// ```no_run
+    /// let mut vault = keres::Vault::new("secrets".into());
+    /// vault.unlock("correct horse")?;
+    /// vault.add_from_reader("notes.txt", &b"hello"[..], Some(5))?;
+    /// # Ok::<(), keres::Error>(())
+    /// ```
+    pub fn add_from_reader<R: std::io::Read>(
+        &mut self,
+        name: &str,
+        mut reader: R,
+        len: Option<u64>,
+    ) -> Result<()> {
+        let master = self.require_unlocked()?;
+        let _lock = self.lock_exclusive()?;
+        sanitize::validate_root_name(name)?;
+
+        let (mut all, padding) = manifest::load_with_padding(&self.path, &master)?;
+        if all.contains_key(name) {
+            return Err(Error::EntryExists(name.to_string()));
+        }
+
+        let id = new_entry_id();
+        let meta = EntryMetadata {
+            id: id.clone(),
+            original_name: name.to_string(),
+            original_size: 0,
+            is_directory: false,
+            children: None,
+            content_hash: None,
+        };
+        let (_, hash, size) = blobs::write_entry_from_reader(
+            &self.path,
+            &master,
+            &id,
+            &meta,
+            Some(&mut reader),
+            padding,
+            len,
+        )?;
+        all.insert(
+            name.to_string(),
+            EntryMetadata {
+                original_size: size,
+                content_hash: Some(hash),
+                ..meta
+            },
+        );
+        manifest::save(&self.path, &all, &master, padding)?;
+        Ok(())
+    }
+
+    /// Replaces a file entry from an arbitrary [`std::io::Read`] source.
+    ///
+    /// This is the streaming counterpart to [`Vault::replace`]. `name` must
+    /// refer to a file entry; directories are rejected. As with
+    /// [`Vault::add_from_reader`], `len` is required when the vault uses size
+    /// padding and may be `None` otherwise.
+    ///
+    /// The new blob is written before the index commits and the old blob is
+    /// removed only afterwards, so a failure leaves the previous version
+    /// readable.
+    ///
+    /// ```no_run
+    /// let mut vault = keres::Vault::new("secrets".into());
+    /// vault.unlock("correct horse")?;
+    /// vault.replace_from_reader("notes.txt", &b"updated"[..], Some(7))?;
+    /// # Ok::<(), keres::Error>(())
+    /// ```
+    pub fn replace_from_reader<R: std::io::Read>(
+        &mut self,
+        name: &str,
+        mut reader: R,
+        len: Option<u64>,
+    ) -> Result<()> {
+        let master = self.require_unlocked()?;
+        let _lock = self.lock_exclusive()?;
+        sanitize::validate_new_name(name)?;
+
+        let (mut all, padding) = manifest::load_with_padding(&self.path, &master)?;
+        let existing = all
+            .get(name)
+            .ok_or_else(|| Error::EntryNotFound(preview(name)))?;
+        if existing.is_directory {
+            return Err(Error::Operation(
+                "cannot replace a directory entry; remove it first".into(),
+            ));
+        }
+        let old_id = existing.id.clone();
+
+        let id = new_entry_id();
+        let meta = EntryMetadata {
+            id: id.clone(),
+            original_name: name.to_string(),
+            original_size: 0,
+            is_directory: false,
+            children: None,
+            content_hash: None,
+        };
+        let (_, hash, size) = blobs::write_entry_from_reader(
+            &self.path,
+            &master,
+            &id,
+            &meta,
+            Some(&mut reader),
+            padding,
+            len,
+        )?;
+        all.insert(
+            name.to_string(),
+            EntryMetadata {
+                original_size: size,
+                content_hash: Some(hash),
+                ..meta
+            },
+        );
+        manifest::save(&self.path, &all, &master, padding)?;
+        let _ = blobs::remove_blob(&self.path, &master, &old_id);
+        Ok(())
+    }
+
+    /// Writes a file entry's plaintext to an arbitrary [`std::io::Write`].
+    ///
+    /// This is the streaming counterpart to [`Vault::extract`] for
+    /// applications that want to process bytes without a temporary file.
+    /// Returns the authenticated plaintext size. Directory entries are
+    /// rejected.
+    ///
+    /// The writer is flushed before this returns. Because the container's
+    /// trailer is authenticated only after the last chunk, some plaintext may
+    /// be written before a final integrity error is reported. Stage the
+    /// output and discard it on error when that matters.
+    ///
+    /// ```no_run
+    /// let vault = keres::Vault::new("secrets".into());
+    /// let mut out = Vec::new();
+    /// vault.extract_to_writer("notes.txt", &mut out)?;
+    /// # Ok::<(), keres::Error>(())
+    /// ```
+    pub fn extract_to_writer<W: std::io::Write>(&self, name: &str, mut writer: W) -> Result<u64> {
+        let master = self.require_unlocked()?;
+        let _lock = self.lock_shared()?;
+
+        let all = manifest::load(&self.path, &master)?;
+        let meta = all
+            .get(name)
+            .ok_or_else(|| Error::EntryNotFound(preview(name)))?;
+        if meta.is_directory {
+            return Err(Error::Operation(
+                "cannot extract a directory to a writer; use extract".into(),
+            ));
+        }
+
+        let size = blobs::read_entry_checked(&self.path, &master, meta, |chunk| {
+            writer.write_all(chunk)?;
+            Ok(())
+        })?;
+        writer.flush()?;
+        Ok(size)
+    }
+
     /// Renames a top-level file or directory entry without re-encrypting it.
     ///
     /// Because blob locations and container AAD are derived from the entry's
@@ -798,8 +1047,9 @@ impl Vault {
 
         let config = self.load_config()?;
         let discarded = config.slot_ids().len().saturating_sub(1);
+        let kdf = config.kdf_params();
         let new_master = Key::generate();
-        let new_config = VaultConfig::new(&new_master, new_password)?;
+        let new_config = VaultConfig::new(&new_master, new_password, kdf)?;
         let report = rotation::run(
             &self.path,
             &old_master,
@@ -979,7 +1229,9 @@ impl Vault {
             }
         }
 
-        let config = VaultConfig::new(&master, new_password)?;
+        // The old config may be missing or corrupt, so there are no slot
+        // parameters to inherit; fall back to the library defaults.
+        let config = VaultConfig::new(&master, new_password, KdfParams::new())?;
         self.write_config(&config)?;
         // The vault is recovered even if the kit cannot be deleted; keep it
         // usable and report the cleanup failure so the caller knows the code
@@ -1136,9 +1388,10 @@ impl Vault {
         let config = self.load_config()?;
         let (old_master, _) = config.unlock(old_password)?;
         let discarded_keyslots = config.slot_ids().len().saturating_sub(1);
+        let kdf = config.kdf_params();
 
         let new_master = Key::generate();
-        let new_config = VaultConfig::new(&new_master, new_password)?;
+        let new_config = VaultConfig::new(&new_master, new_password, kdf)?;
         let report = rotation::run(
             &self.path,
             &old_master,

@@ -377,6 +377,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    use crate::kdf::KdfParams;
     use crate::vault::Vault;
 
     fn make_vault(tag: &str) -> (tempfile::TempDir, Vault) {
@@ -480,7 +481,7 @@ mod tests {
                 .unwrap();
         let old_master = config.unwrap_master_key("old-password").unwrap();
         let new_master = Key::generate();
-        let new_config = VaultConfig::new(&new_master, "rotated").unwrap();
+        let new_config = VaultConfig::new(&new_master, "rotated", KdfParams::new()).unwrap();
 
         let old_files = manifest::load(&dir, &old_master).unwrap();
         let mut new_files = ManifestMap::new();
@@ -528,7 +529,7 @@ mod tests {
         vault.lock();
 
         let new_master = Key::generate();
-        let new_config = VaultConfig::new(&new_master, "rotated").unwrap();
+        let new_config = VaultConfig::new(&new_master, "rotated", KdfParams::new()).unwrap();
         let journal = Journal {
             version: JOURNAL_VERSION,
             manifest_sha256: "00".repeat(32),

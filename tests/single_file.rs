@@ -147,3 +147,98 @@ fn missing_input_is_clean_error() {
     let err = encrypt_file("pw", Path::new("/nonexistent/file"), None).unwrap_err();
     assert!(matches!(err, Error::InvalidEntryName(_)));
 }
+
+#[test]
+fn custom_kdf_parameters_round_trip() {
+    let dir = setup("customkdf");
+    let src = dir.path().join("f.bin");
+    let data = vec![0x42u8; 150_000];
+    std::fs::write(&src, &data).unwrap();
+
+    let options = keres::EncryptOptions::new().kdf(keres::KdfParams {
+        m_cost_kib: 8 * 1024,
+        t_cost: 1,
+        p_cost: 1,
+    });
+    let out =
+        keres::encrypt_file_with_options("pw", &src, Some(&dir.path().join("custom.krs")), options)
+            .unwrap();
+
+    let dst = dir.path().join("out.bin");
+    keres::decrypt_file("pw", &out, &dst).unwrap();
+    assert_eq!(std::fs::read(&dst).unwrap(), data);
+}
+
+#[test]
+fn options_padding_hides_exact_size() {
+    let dir = setup("optionspadding");
+    let src = dir.path().join("f.bin");
+    std::fs::write(&src, vec![1u8; 1000]).unwrap();
+
+    let plain = keres::encrypt_file("pw", &src, Some(&dir.path().join("plain.krs"))).unwrap();
+    let padded = keres::encrypt_file_with_options(
+        "pw",
+        &src,
+        Some(&dir.path().join("padded.krs")),
+        keres::EncryptOptions::new().padding(keres::Padding::Adaptive),
+    )
+    .unwrap();
+
+    assert!(padded.metadata().unwrap().len() > plain.metadata().unwrap().len());
+    let dst = dir.path().join("out.bin");
+    keres::decrypt_file("pw", &padded, &dst).unwrap();
+    assert_eq!(std::fs::read(&dst).unwrap(), vec![1u8; 1000]);
+}
+
+#[test]
+fn invalid_kdf_options_are_rejected() {
+    let dir = setup("badkdf");
+    let src = dir.path().join("f.bin");
+    std::fs::write(&src, b"x").unwrap();
+
+    let err = keres::encrypt_file_with_options(
+        "pw",
+        &src,
+        Some(&dir.path().join("bad.krs")),
+        keres::EncryptOptions::new().kdf(keres::KdfParams {
+            m_cost_kib: 1,
+            t_cost: 1,
+            p_cost: 1,
+        }),
+    )
+    .unwrap_err();
+    assert!(matches!(err, Error::InvalidKdfParams));
+    assert!(!dir.path().join("bad.krs").exists());
+}
+
+#[test]
+fn streaming_options_accept_custom_kdf() {
+    use keres::streaming::{decrypt_stream, encrypt_stream, StreamOptions};
+    use std::io::Cursor;
+
+    let payload = b"streamed with a custom cost".to_vec();
+    let mut ciphertext = Vec::new();
+    encrypt_stream(
+        "pw",
+        &mut Cursor::new(payload.clone()),
+        &mut ciphertext,
+        Some("note.txt"),
+        StreamOptions::new().kdf(keres::KdfParams {
+            m_cost_kib: 8 * 1024,
+            t_cost: 1,
+            p_cost: 1,
+        }),
+    )
+    .unwrap();
+
+    let mut plaintext = Vec::new();
+    let info = decrypt_stream(
+        "pw",
+        Cursor::new(ciphertext),
+        &mut plaintext,
+        StreamOptions::new(),
+    )
+    .unwrap();
+    assert_eq!(plaintext, payload);
+    assert_eq!(info.original_name.as_deref(), Some("note.txt"));
+}

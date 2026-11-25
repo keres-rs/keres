@@ -35,15 +35,31 @@
 //! let name = keres::decrypt_file("correct horse", &out, Path::new("restored.pdf")).unwrap();
 //! assert_eq!(name, "document.pdf");
 //!
-//! // Multi-file vault.
+//! // Multi-file vault. `init` leaves the new vault unlocked.
 //! let mut vault = keres::Vault::new("myvault".into());
 //! vault.init("correct horse").unwrap();
-//! vault.unlock("correct horse").unwrap();
 //! vault.add(Path::new("secret.pdf"), None).unwrap();
 //! for e in vault.list().unwrap() {
 //!     println!("{} ({} bytes)", e.name, e.size);
 //! }
 //! vault.lock();
+//! ```
+//!
+//! Both APIs also accept in-memory data. Use [`streaming`] for standalone
+//! `.krs` containers, and [`Vault::add_from_reader`] /
+//! [`Vault::extract_to_writer`] for vault entries:
+//!
+//! ```
+//! let payload = b"stored without a temporary file";
+//! let dir = tempfile::tempdir()?;
+//! let mut vault = keres::Vault::new(dir.path().join("vault"));
+//! vault.init("correct horse")?;
+//! vault.add_from_reader("note.txt", &payload[..], Some(payload.len() as u64))?;
+//!
+//! let mut restored = Vec::new();
+//! vault.extract_to_writer("note.txt", &mut restored)?;
+//! assert_eq!(restored, payload);
+//! # Ok::<(), keres::Error>(())
 //! ```
 //!
 //! ## Choosing an API
@@ -126,26 +142,34 @@ pub mod vault;
 pub mod prelude {
     pub use crate::crypto::Key;
     pub use crate::error::{Error, Result};
+    pub use crate::kdf::KdfParams;
     pub use crate::padding::Padding;
-    pub use crate::single_file::{decrypt_file, encrypt_file, encrypt_file_with_padding};
+    pub use crate::single_file::{
+        decrypt_file, encrypt_file, encrypt_file_with_options, encrypt_file_with_padding,
+        EncryptOptions,
+    };
     pub use crate::streaming::{
         decrypt_stream, encrypt_stream, DecryptReader, EncryptWriter, StreamInfo, StreamOptions,
     };
     pub use crate::vault::{
         BatchOp, EntryInfo, IndexVersion, IntegrityReport, KeyslotInfo, MigrationReport,
-        RecoveryCode, RotationReport, Vault, WriteOutcome,
+        RecoveryCode, RotationReport, Vault, VaultOptions, WriteOutcome,
     };
 }
 
 pub use error::{Error, Result};
+pub use kdf::KdfParams;
 pub use padding::Padding;
-pub use single_file::{decrypt_file, encrypt_file, encrypt_file_with_padding};
+pub use single_file::{
+    decrypt_file, encrypt_file, encrypt_file_with_options, encrypt_file_with_padding,
+    EncryptOptions,
+};
 pub use streaming::{
     decrypt_stream, encrypt_stream, DecryptReader, EncryptWriter, StreamInfo, StreamOptions,
 };
 pub use vault::{
     BatchOp, EntryInfo, IndexVersion, IntegrityReport, KeyslotInfo, MigrationReport, RecoveryCode,
-    RotationReport, Vault, WriteOutcome,
+    RotationReport, Vault, VaultOptions, WriteOutcome,
 };
 
 /// Crate version, handy for CLI `--version` output.

@@ -124,11 +124,27 @@ impl VaultConfig {
     }
 
     /// Builds a new single-slot config around `master`.
-    pub(crate) fn new(master: &Key, password: &str) -> Result<Self> {
+    pub(crate) fn new(master: &Key, password: &str, kdf: KdfParams) -> Result<Self> {
         Ok(Self::Slots(SlotConfig {
             version: CONFIG_VERSION,
-            slots: vec![KeySlot::wrap(master, password)?],
+            slots: vec![KeySlot::wrap(master, password, kdf)?],
         }))
+    }
+
+    /// KDF parameters of the vault's first keyslot.
+    ///
+    /// New keyslots and re-wrapped passwords inherit these so a vault keeps
+    /// the cost chosen when it was created. Falls back to the library
+    /// defaults for a malformed empty slot table.
+    pub(crate) fn kdf_params(&self) -> KdfParams {
+        match self {
+            Self::Legacy(config) => config.kdf,
+            Self::Slots(config) => config
+                .slots
+                .first()
+                .map(|slot| slot.kdf)
+                .unwrap_or_default(),
+        }
     }
 
     /// Slot descriptions in on-disk order.
@@ -198,17 +214,14 @@ impl VaultConfig {
                 if index != 0 {
                     return Err(Error::InvalidVault);
                 }
-                Self::new(master, new_password)
+                Self::new(master, new_password, self.kdf_params())
             }
             Self::Slots(config) => {
-                let id = config
-                    .slots
-                    .get(index)
-                    .ok_or(Error::InvalidVault)?
-                    .id
-                    .clone();
+                let slot = config.slots.get(index).ok_or(Error::InvalidVault)?;
+                let id = slot.id.clone();
+                let kdf = slot.kdf;
                 let mut slots = config.slots.clone();
-                slots[index] = KeySlot::wrap_with_id(master, new_password, id)?;
+                slots[index] = KeySlot::wrap_with_id(master, new_password, id, kdf)?;
                 Ok(Self::Slots(SlotConfig {
                     version: CONFIG_VERSION,
                     slots,
@@ -229,13 +242,14 @@ impl VaultConfig {
         existing_password: &str,
         new_password: &str,
     ) -> Result<(Self, KeyslotInfo)> {
-        let new_slot = KeySlot::wrap(master, new_password)?;
+        let kdf = self.kdf_params();
+        let new_slot = KeySlot::wrap(master, new_password, kdf)?;
         let info = KeyslotInfo {
             id: new_slot.id.clone(),
         };
 
         let slots = match self {
-            Self::Legacy(_) => vec![KeySlot::wrap(master, existing_password)?, new_slot],
+            Self::Legacy(_) => vec![KeySlot::wrap(master, existing_password, kdf)?, new_slot],
             Self::Slots(config) => {
                 let mut slots = config.slots.clone();
                 slots.push(new_slot);
@@ -281,15 +295,14 @@ impl VaultConfig {
 
 impl KeySlot {
     /// Wraps `master` under a fresh KEK with a new random id.
-    fn wrap(master: &Key, password: &str) -> Result<Self> {
-        Self::wrap_with_id(master, password, new_slot_id())
+    fn wrap(master: &Key, password: &str, params: KdfParams) -> Result<Self> {
+        Self::wrap_with_id(master, password, new_slot_id(), params)
     }
 
     /// Wraps `master` under a fresh KEK, reusing `id` (for password changes).
-    fn wrap_with_id(master: &Key, password: &str, id: String) -> Result<Self> {
+    fn wrap_with_id(master: &Key, password: &str, id: String, params: KdfParams) -> Result<Self> {
         let mut salt = [0u8; crypto::SALT_LEN];
         crypto::fill_random(&mut salt);
-        let params = KdfParams::new();
         let kek = crypto::derive_key(password.as_bytes(), &salt, params)?;
 
         let nonce = crypto::random_nonce();
@@ -405,9 +418,9 @@ impl KeyStore {
     }
 
     /// Creates a fresh master key wrapped under `password`.
-    pub(crate) fn init(&mut self, password: &str) -> Result<VaultConfig> {
+    pub(crate) fn init(&mut self, password: &str, kdf: KdfParams) -> Result<VaultConfig> {
         let master = Key::generate();
-        let config = VaultConfig::new(&master, password)?;
+        let config = VaultConfig::new(&master, password, kdf)?;
         self.master_key = Some(master);
         Ok(config)
     }
@@ -452,7 +465,7 @@ mod tests {
     #[test]
     fn v3_roundtrip_and_slot_listing() {
         let master = Key::generate();
-        let config = VaultConfig::new(&master, "pw").unwrap();
+        let config = VaultConfig::new(&master, "pw", KdfParams::new()).unwrap();
         let json = serde_json::to_string_pretty(&config).unwrap();
 
         let parsed = VaultConfig::parse(&json).unwrap();
@@ -498,7 +511,7 @@ mod tests {
     #[test]
     fn rewrapping_one_slot_keeps_the_others() {
         let master = Key::generate();
-        let config = VaultConfig::new(&master, "first").unwrap();
+        let config = VaultConfig::new(&master, "first", KdfParams::new()).unwrap();
         let (config, _) = config.add_slot(&master, "first", "second").unwrap();
 
         let (_, index) = config.unlock("first").unwrap();
@@ -521,14 +534,14 @@ mod tests {
     #[test]
     fn removing_the_only_slot_is_refused() {
         let master = Key::generate();
-        let config = VaultConfig::new(&master, "pw").unwrap();
+        let config = VaultConfig::new(&master, "pw", KdfParams::new()).unwrap();
         assert!(matches!(config.remove_slot(0), Err(Error::Operation(_))));
     }
 
     #[test]
     fn slot_identity_is_bound_into_the_aad() {
         let master = Key::generate();
-        let config = VaultConfig::new(&master, "pw").unwrap();
+        let config = VaultConfig::new(&master, "pw", KdfParams::new()).unwrap();
         let (config, _) = config.add_slot(&master, "pw", "other").unwrap();
 
         let VaultConfig::Slots(mut slots) = config else {

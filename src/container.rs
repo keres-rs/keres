@@ -455,8 +455,8 @@ pub(crate) fn ensure_eof<R: Read>(inner: &mut R) -> Result<()> {
 }
 
 /// Generates the password-based key derivation used by standalone `.krs`
-/// containers.
-pub(crate) fn password_key_derivation() -> KeyDerivation {
+/// containers with caller-supplied Argon2id parameters.
+pub(crate) fn password_key_derivation_with_params(params: KdfParams) -> KeyDerivation {
     let mut argon_salt = [0u8; SALT_LEN];
     let mut object_salt = [0u8; SALT_LEN];
     crypto::fill_random(&mut argon_salt);
@@ -464,7 +464,7 @@ pub(crate) fn password_key_derivation() -> KeyDerivation {
     KeyDerivation::Password {
         argon_salt,
         object_salt,
-        params: KdfParams::new(),
+        params,
     }
 }
 

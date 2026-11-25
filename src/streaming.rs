@@ -73,9 +73,10 @@ use zeroize::Zeroizing;
 use crate::container::{self, PayloadType};
 use crate::crypto::Key;
 use crate::error::{Error, Result};
+use crate::kdf::KdfParams;
 use crate::stream::{self, CHUNK_SIZE};
 
-/// Per-stream callbacks: progress and cooperative cancellation.
+/// Per-stream callbacks and encryption settings.
 ///
 /// The callback receives cumulative plaintext bytes after each processed
 /// chunk. Cancellation is polled before each chunk, so a flag set by any
@@ -84,10 +85,11 @@ use crate::stream::{self, CHUNK_SIZE};
 pub struct StreamOptions<'a> {
     on_progress: Option<&'a mut dyn FnMut(u64)>,
     cancel: Option<&'a AtomicBool>,
+    kdf: KdfParams,
 }
 
 impl<'a> StreamOptions<'a> {
-    /// No progress callback and no cancellation flag.
+    /// No progress callback, no cancellation flag, and default KDF parameters.
     pub fn new() -> Self {
         Self::default()
     }
@@ -101,6 +103,15 @@ impl<'a> StreamOptions<'a> {
     /// Stops the stream with [`Error::Cancelled`] when `flag` becomes `true`.
     pub fn cancel(mut self, flag: &'a AtomicBool) -> Self {
         self.cancel = Some(flag);
+        self
+    }
+
+    /// Sets the Argon2id parameters used when encrypting.
+    ///
+    /// Decryption reads the parameters from the container header, so this
+    /// setting is ignored by [`DecryptReader`] and [`decrypt_stream`].
+    pub fn kdf(mut self, kdf: KdfParams) -> Self {
+        self.kdf = kdf;
         self
     }
 
@@ -161,7 +172,8 @@ impl<'a, W: Write> EncryptWriter<'a, W> {
         original_name: Option<&str>,
         options: StreamOptions<'a>,
     ) -> Result<Self> {
-        let kd = container::password_key_derivation();
+        options.kdf.validate()?;
+        let kd = container::password_key_derivation_with_params(options.kdf);
         let key = kd.content_key(Some(password), None, b"")?;
         let context = PayloadType::File.context(container::ENVELOPE_VERSION)?;
         kd.write_header(&mut inner, container::ENVELOPE_VERSION)?;

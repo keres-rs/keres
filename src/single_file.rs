@@ -12,9 +12,62 @@ use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use crate::container::{self, KeyDerivation, PayloadType};
+use crate::kdf::KdfParams;
 use crate::padding::Padding;
 
 use crate::error::{Error, Result};
+
+/// Options for encrypting a single file into a `.krs` container.
+///
+/// The defaults match [`encrypt_file`]: no size padding and the library's
+/// standard Argon2id parameters.
+///
+/// ```no_run
+/// use keres::{EncryptOptions, KdfParams, Padding};
+///
+/// let options = EncryptOptions::new()
+///     .padding(Padding::Adaptive)
+///     .kdf(KdfParams {
+///         m_cost_kib: 32 * 1024,
+///         t_cost: 3,
+///         p_cost: 2,
+///     });
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EncryptOptions {
+    /// Size-padding policy. Defaults to [`Padding::None`].
+    pub padding: Padding,
+    /// Argon2id parameters. Defaults to [`KdfParams::new`].
+    pub kdf: KdfParams,
+}
+
+impl Default for EncryptOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EncryptOptions {
+    /// No padding and the standard Argon2id parameters.
+    pub const fn new() -> Self {
+        Self {
+            padding: Padding::None,
+            kdf: KdfParams::new(),
+        }
+    }
+
+    /// Sets the size-padding policy.
+    pub const fn padding(mut self, padding: Padding) -> Self {
+        self.padding = padding;
+        self
+    }
+
+    /// Sets the Argon2id parameters.
+    pub const fn kdf(mut self, kdf: KdfParams) -> Self {
+        self.kdf = kdf;
+        self
+    }
+}
 
 /// Encrypts `input` into a `.krs` container.
 ///
@@ -27,15 +80,15 @@ use crate::error::{Error, Result};
 /// Returns the path of the written container. Output is produced atomically
 /// (temp file + rename) with owner-only permissions on Unix.
 ///
-/// The container is unpadded. Use [`encrypt_file_with_padding`] to hide the
-/// exact plaintext size from someone who can measure the ciphertext.
+/// The container is unpadded and uses the standard Argon2id parameters. Use
+/// [`encrypt_file_with_options`] to change either.
 ///
 /// ```no_run
 /// use std::path::Path;
 /// let out = keres::encrypt_file("correct horse", Path::new("document.pdf"), None).unwrap();
 /// ```
 pub fn encrypt_file(password: &str, input: &Path, output: Option<&Path>) -> Result<PathBuf> {
-    encrypt_file_with_padding(password, input, output, Padding::None)
+    encrypt_file_with_options(password, input, output, EncryptOptions::new())
 }
 
 /// Encrypts `input` into a `.krs` container using `padding`.
@@ -49,7 +102,28 @@ pub fn encrypt_file_with_padding(
     output: Option<&Path>,
     padding: Padding,
 ) -> Result<PathBuf> {
-    padding.validate()?;
+    encrypt_file_with_options(
+        password,
+        input,
+        output,
+        EncryptOptions::new().padding(padding),
+    )
+}
+
+/// Encrypts `input` into a `.krs` container with explicit options.
+///
+/// This is the general form of [`encrypt_file`]. Use it to select a
+/// non-default Argon2id cost, for example a lower memory budget on a
+/// memory-constrained device or a higher one for long-term storage, or to
+/// enable size padding.
+pub fn encrypt_file_with_options(
+    password: &str,
+    input: &Path,
+    output: Option<&Path>,
+    options: EncryptOptions,
+) -> Result<PathBuf> {
+    options.padding.validate()?;
+    options.kdf.validate()?;
 
     let input_path = input
         .canonicalize()
@@ -72,7 +146,7 @@ pub fn encrypt_file_with_padding(
     let kd = KeyDerivation::Password {
         argon_salt,
         object_salt,
-        params: crate::kdf::KdfParams::new(),
+        params: options.kdf,
     };
 
     let output_path = match output {
@@ -103,7 +177,7 @@ pub fn encrypt_file_with_padding(
                 b"",
                 Some(&mut src),
                 Some(&original_name),
-                padding,
+                options.padding,
                 Some(source_len),
             )?;
             w.flush()?;

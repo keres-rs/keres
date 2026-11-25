@@ -252,6 +252,7 @@ mod tests {
 
     use crate::container::KeyDerivation;
     use crate::crypto;
+    use crate::kdf::KdfParams;
     use crate::vault::keystore::KeyStore;
     use crate::vault::Vault;
 
@@ -261,7 +262,7 @@ mod tests {
         std::fs::create_dir_all(dir.join("d")).unwrap();
 
         let mut store = KeyStore::new();
-        let config = store.init(password).unwrap();
+        let config = store.init(password, KdfParams::new()).unwrap();
         let master = store.master_key().unwrap().clone();
         let cfg_json = serde_json::to_string_pretty(&config).unwrap();
         crate::fsutil::atomic_write(&dir.join("vault.config"), cfg_json.as_bytes()).unwrap();
@@ -456,7 +457,7 @@ mod tests {
         let dir = tmp.path().join("vault");
         std::fs::create_dir_all(dir.join("d")).unwrap();
         let mut store = KeyStore::new();
-        let config = store.init("pw").unwrap();
+        let config = store.init("pw", KdfParams::new()).unwrap();
         let cfg_json = serde_json::to_string_pretty(&config).unwrap();
         std::fs::write(dir.join("vault.config"), cfg_json).unwrap();
 

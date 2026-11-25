@@ -898,3 +898,144 @@ fn orphaned_compaction_staging_is_cleaned_up() {
         .iter()
         .any(|e| e.name == "after-crash.txt"));
 }
+
+#[test]
+fn reader_and_writer_round_trip() {
+    let (_d, mut v) = make_vault("readwrite");
+    let payload = b"bytes that never touch a temporary file";
+
+    v.add_from_reader("note.txt", &payload[..], Some(payload.len() as u64))
+        .unwrap();
+    assert_eq!(v.list().unwrap()[0].size, payload.len() as u64);
+
+    let mut restored = Vec::new();
+    let size = v.extract_to_writer("note.txt", &mut restored).unwrap();
+    assert_eq!(size, payload.len() as u64);
+    assert_eq!(restored, payload);
+}
+
+#[test]
+fn add_from_reader_without_length_streams_unpadded_vault() {
+    let (_d, mut v) = make_vault("readnolen");
+    let payload = vec![0x5Au8; 200_000]; // multiple chunks
+
+    v.add_from_reader("blob.bin", &payload[..], None).unwrap();
+
+    let mut restored = Vec::new();
+    v.extract_to_writer("blob.bin", &mut restored).unwrap();
+    assert_eq!(restored, payload);
+}
+
+#[test]
+fn padded_vault_reader_requires_known_length() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut v = Vault::new(dir.path().join("vault"));
+    v.init_with_options(
+        "master-password",
+        keres::VaultOptions::new().padding(Padding::Adaptive),
+    )
+    .unwrap();
+
+    let payload = b"padded payload";
+    // Unknown length cannot be padded before reading.
+    assert!(matches!(
+        v.add_from_reader("unknown.txt", &payload[..], None),
+        Err(Error::Operation(_))
+    ));
+    assert!(v.list().unwrap().is_empty());
+
+    // A wrong length is detected while streaming and leaves no index record.
+    assert!(matches!(
+        v.add_from_reader("wrong.txt", &payload[..], Some(payload.len() as u64 + 1)),
+        Err(Error::Operation(_))
+    ));
+    assert!(v.list().unwrap().is_empty());
+
+    v.add_from_reader("note.txt", &payload[..], Some(payload.len() as u64))
+        .unwrap();
+    let mut restored = Vec::new();
+    v.extract_to_writer("note.txt", &mut restored).unwrap();
+    assert_eq!(restored, payload);
+}
+
+#[test]
+fn replace_from_reader_updates_contents_and_drops_the_old_blob() {
+    let (_d, mut v) = make_vault("readreplace");
+    v.add_from_reader("doc.txt", &b"version one"[..], Some(11))
+        .unwrap();
+    let before = walk_blobs(&v.path().join("d"));
+
+    let updated = b"version two, longer";
+    v.replace_from_reader("doc.txt", &updated[..], Some(updated.len() as u64))
+        .unwrap();
+
+    let mut restored = Vec::new();
+    v.extract_to_writer("doc.txt", &mut restored).unwrap();
+    assert_eq!(restored, updated);
+    assert_eq!(v.list().unwrap()[0].size, updated.len() as u64);
+    assert_ne!(walk_blobs(&v.path().join("d")), before);
+    assert_eq!(walk_blobs(&v.path().join("d")).len(), 1);
+}
+
+#[test]
+fn reader_apis_reject_bad_names_and_missing_entries() {
+    let (dir, mut v) = make_vault("readerrors");
+
+    for name in ["../escape", "nested/file.txt"] {
+        assert!(
+            matches!(
+                v.add_from_reader(name, &b"x"[..], Some(1)),
+                Err(Error::InvalidEntryName(_))
+            ),
+            "{name} should be rejected as a top-level name"
+        );
+    }
+    assert!(matches!(
+        v.replace_from_reader("missing.txt", &b"x"[..], Some(1)),
+        Err(Error::EntryNotFound(_))
+    ));
+    assert!(matches!(
+        v.extract_to_writer("missing.txt", &mut Vec::new()),
+        Err(Error::EntryNotFound(_))
+    ));
+
+    // Directories cannot be extracted to a single writer.
+    let tree = dir.path().join("tree");
+    std::fs::create_dir_all(&tree).unwrap();
+    std::fs::write(tree.join("a.txt"), b"a").unwrap();
+    v.add(&tree, None).unwrap();
+    assert!(matches!(
+        v.extract_to_writer("tree", &mut Vec::new()),
+        Err(Error::Operation(_))
+    ));
+}
+
+#[test]
+fn custom_kdf_parameters_round_trip() {
+    let dir = tempfile::tempdir().unwrap();
+    let vault_dir = dir.path().join("vault");
+    let mut v = Vault::new(vault_dir.clone());
+    v.init_with_options(
+        "master-password",
+        keres::VaultOptions::new().kdf(keres::KdfParams {
+            m_cost_kib: 8 * 1024,
+            t_cost: 1,
+            p_cost: 1,
+        }),
+    )
+    .unwrap();
+    v.add_from_reader("note.txt", &b"custom kdf"[..], Some(10))
+        .unwrap();
+
+    // New keyslots inherit the vault's parameters.
+    v.add_keyslot("master-password", "second-pass").unwrap();
+    v.lock();
+
+    let mut reopened = Vault::new(vault_dir);
+    reopened.unlock("second-pass").unwrap();
+    let mut restored = Vec::new();
+    reopened
+        .extract_to_writer("note.txt", &mut restored)
+        .unwrap();
+    assert_eq!(restored, b"custom kdf");
+}
