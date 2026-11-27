@@ -51,6 +51,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   property is unchanged.
 - The container fuzz target now exercises the v2 padding-header decoder
   directly, which is otherwise gated behind a valid AEAD record.
+- The security model now documents the lack of a key-commitment tag and the
+  whole-vault rollback limitation, and defines a prioritized audit scope
+  covering the format, key hierarchy, rollback, metadata leakage, crash
+  safety, and API misuse resistance.
 
 ## [0.7.1] - 2026-11-25
 

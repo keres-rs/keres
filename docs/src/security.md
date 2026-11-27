@@ -232,6 +232,44 @@ only. Verification does not detect a rollback of the entire vault directory.
    occurred and roughly when. Access patterns are not hidden.
 8. **No independent audit.** The implementation has not been reviewed by an
    external cryptography or security firm.
+9. **No key commitment.** AES-GCM is not key-committing: an attacker who
+   controls a file could in principle construct one ciphertext that
+   authenticates under two different keys. Keres limits the impact by using a
+   single key per container, a fresh random object salt, and an authenticated,
+   structured trailer (payload type, size, chunk count) that must also parse.
+   A wrong password therefore still fails in practice, but the format has no
+   formal commitment tag. This is tracked for a future envelope version and
+   for the audit.
+
+## Audit scope
+
+The first independent audit should focus on the following, in priority order.
+This list is also the starting point for quote requests.
+
+1. **Container format and stream engine.** Header binding, AAD domains,
+   deterministic nonce construction, trailer and padding records, record and
+   chunk-count limits, and parser behavior on truncated or oversized input.
+   Fuzz targets cover the container reader, manifest decoder, config parser,
+   and padding header.
+2. **Key hierarchy.** Argon2id parameter handling and bounds, HKDF domain
+   separation between object kinds, keyslot wrapping and slot-id binding,
+   recovery-kit construction, and the rotation and erasure journals.
+3. **Key commitment and partitioning oracles.** Whether the absence of a
+   commitment tag is exploitable for password-derived `.krs` files, and
+   whether single-key containers are sufficient in practice.
+4. **Rollback and truncation.** Whole-directory rollback, index-log tail
+   truncation, and the interaction between content hashes, generation
+   numbers, and compaction.
+5. **Metadata leakage.** What the padding scheme actually hides, and whether
+   this document matches the implementation.
+6. **Filesystem and crash safety.** Temp-file handling, permissions,
+   symlink and race behavior, and recovery from interrupted rotation,
+   compaction, and migration.
+7. **API misuse resistance.** Whether the hardened public API makes it hard
+   to reuse a key accidentally, skip authentication, or ignore an error.
+
+Out of scope for the first audit: ORAM and access-pattern hiding, plausible
+deniability, network synchronization, and hardware-backed factors.
 
 ## Reporting a vulnerability
 
