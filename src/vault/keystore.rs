@@ -40,6 +40,7 @@ pub(crate) const LEGACY_SLOT_ID: &str = "legacy";
 /// Public description of one keyslot. Contains no secret material: slot ids
 /// are stored in plaintext in `vault.config`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct KeyslotInfo {
     /// Stable random slot id, used to revoke the slot later.
     pub id: String,

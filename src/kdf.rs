@@ -24,6 +24,7 @@ pub struct KdfParams {
 impl KdfParams {
     /// Library defaults: Argon2id with 64 MiB memory, 4 passes, parallelism 4
     /// (matches the keres CLI ≥ 0.2).
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             m_cost_kib: 65_536,

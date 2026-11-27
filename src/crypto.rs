@@ -46,17 +46,20 @@ pub struct Key(Zeroizing<[u8; KEY_LEN]>);
 
 impl Key {
     /// Generates a fresh random key from the operating system CSPRNG.
+    #[must_use]
     pub fn generate() -> Self {
         Self(Zeroizing::new(random_key_bytes()))
     }
 
     /// Constructs a key from existing bytes. The input is copied into
     /// zeroizing memory; callers are responsible for zeroing their own copy.
+    #[must_use]
     pub fn from_bytes(bytes: [u8; KEY_LEN]) -> Self {
         Self(Zeroizing::new(bytes))
     }
 
     /// Borrows the raw key bytes.
+    #[must_use]
     pub fn expose(&self) -> &[u8; KEY_LEN] {
         &self.0
     }
@@ -87,6 +90,7 @@ pub(crate) fn random_key_bytes() -> [u8; KEY_LEN] {
 }
 
 /// Generates a fresh random nonce.
+#[must_use]
 pub fn random_nonce() -> Nonce12 {
     let mut n = [0u8; NONCE_LEN];
     fill_random(&mut n);
@@ -201,6 +205,7 @@ pub(crate) fn derive_subkey(master: &Key, salt: &[u8], info: &[u8]) -> Key {
 /// Unlike `==`, the runtime does not depend on where the first differing byte
 /// occurs. Length mismatch still returns `false` immediately (lengths are not
 /// secret in this crate).
+#[must_use]
 pub fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;

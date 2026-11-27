@@ -90,17 +90,20 @@ pub struct StreamOptions<'a> {
 
 impl<'a> StreamOptions<'a> {
     /// No progress callback, no cancellation flag, and default KDF parameters.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Reports cumulative plaintext bytes after each chunk.
+    #[must_use]
     pub fn on_progress(mut self, callback: &'a mut dyn FnMut(u64)) -> Self {
         self.on_progress = Some(callback);
         self
     }
 
     /// Stops the stream with [`Error::Cancelled`] when `flag` becomes `true`.
+    #[must_use]
     pub fn cancel(mut self, flag: &'a AtomicBool) -> Self {
         self.cancel = Some(flag);
         self
@@ -110,6 +113,7 @@ impl<'a> StreamOptions<'a> {
     ///
     /// Decryption reads the parameters from the container header, so this
     /// setting is ignored by [`DecryptReader`] and [`decrypt_stream`].
+    #[must_use]
     pub fn kdf(mut self, kdf: KdfParams) -> Self {
         self.kdf = kdf;
         self
@@ -131,6 +135,7 @@ impl<'a> StreamOptions<'a> {
 
 /// Description of a decrypted stream, available after end-of-stream.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct StreamInfo {
     /// Original filename carried in the authenticated trailer, if any.
     pub original_name: Option<String>,
@@ -215,11 +220,13 @@ impl<'a, W: Write> EncryptWriter<'a, W> {
     }
 
     /// Cumulative plaintext bytes accepted so far.
+    #[must_use]
     pub fn bytes_written(&self) -> u64 {
         self.total + self.buffer.len() as u64
     }
 
     /// Number of chunks already emitted.
+    #[must_use]
     pub fn chunks_written(&self) -> u32 {
         self.count
     }
@@ -431,16 +438,19 @@ impl<'a, R: Read> DecryptReader<'a, R> {
 
     /// The original filename, available after EOF or a successful
     /// [`DecryptReader::finish`].
+    #[must_use]
     pub fn original_name(&self) -> Option<&str> {
         self.original_name.as_deref()
     }
 
     /// Plaintext bytes yielded so far.
+    #[must_use]
     pub fn bytes_read(&self) -> u64 {
         self.total
     }
 
     /// Chunks authenticated so far.
+    #[must_use]
     pub fn chunks_read(&self) -> u32 {
         self.count
     }

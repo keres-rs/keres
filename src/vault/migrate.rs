@@ -31,6 +31,7 @@ use super::new_entry_id;
 
 /// Outcome of a successful [`crate::Vault::migrate`] call.
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 pub struct MigrationReport {
     /// Entries rewritten into the current format (files and directories).
     pub entries: usize,

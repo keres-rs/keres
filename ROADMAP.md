@@ -13,8 +13,9 @@ and completed work is recorded in [CHANGELOG.md](CHANGELOG.md).
   substitute.
 - **API and format freeze.** Stabilize the public Rust API and commit to the
   current envelope, config, and manifest versions as the long-term
-  compatibility contract. Add `cargo-semver-checks` and a written MSRV policy
-  before cutting a 1.0 release candidate.
+  compatibility contract. `#[non_exhaustive]`, `#[must_use]`,
+  `cargo-semver-checks`, and the [MSRV policy](docs/src/stability.md) are in
+  place; the remaining work is the 1.0 review and format freeze.
 - **Normative format specification.** Turn the architecture chapter and test
   vectors into a standalone document so applications are not locked to this
   crate.

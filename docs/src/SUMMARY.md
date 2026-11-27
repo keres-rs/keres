@@ -24,6 +24,7 @@
 
 - [CLI reference](./cli-reference.md)
 - [Architecture](./architecture.md)
+- [API stability and versioning](./stability.md)
 - [Security model](./security.md)
 - [Performance](./performance.md)
 - [Format test vectors](./test-vectors.md)

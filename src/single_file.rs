@@ -34,6 +34,7 @@ use crate::error::{Error, Result};
 ///     });
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct EncryptOptions {
     /// Size-padding policy. Defaults to [`Padding::None`].
     pub padding: Padding,
@@ -49,6 +50,7 @@ impl Default for EncryptOptions {
 
 impl EncryptOptions {
     /// No padding and the standard Argon2id parameters.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             padding: Padding::None,
@@ -57,12 +59,14 @@ impl EncryptOptions {
     }
 
     /// Sets the size-padding policy.
+    #[must_use]
     pub const fn padding(mut self, padding: Padding) -> Self {
         self.padding = padding;
         self
     }
 
     /// Sets the Argon2id parameters.
+    #[must_use]
     pub const fn kdf(mut self, kdf: KdfParams) -> Self {
         self.kdf = kdf;
         self

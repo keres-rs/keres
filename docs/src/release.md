@@ -29,9 +29,14 @@ and creates the GitHub release.
    $ cargo clippy --workspace --all-targets --locked -- -D warnings
    $ cargo fmt --all -- --check
    $ cargo doc --workspace --no-deps --locked
+   $ cargo semver-checks --package keres
    $ cargo publish --dry-run --locked -p keres
    $ mdbook build docs
    ```
+
+   The release workflow also runs `cargo-semver-checks`. It derives the
+   release type from `[workspace.package].version`, so bump to the next minor
+   version before the check if the release contains breaking API changes.
 
 4. **Commit the release.** The release workflow requires the tag to be on
    `main`.

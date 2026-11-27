@@ -57,6 +57,14 @@ jobs:
       - name: Test
         run: cargo test --workspace --locked
 
+      # Compares the public API against the last published release. A breaking
+      # change must be accompanied by a minor version bump, so a patch release
+      # that removes or reshapes API fails before publishing.
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: keres
+
   publish:
     name: Publish to crates.io
     needs: verify

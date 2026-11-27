@@ -37,7 +37,9 @@ compatibility or convenience.
   `hmac-secret` support combined with a password. Plain password vaults remain
   the default.
 - **API stabilization.** Freeze the public Rust API and commit to semantic
-  versioning. Until then, minor releases may change APIs.
+  versioning. `#[non_exhaustive]`, `#[must_use]`, `cargo-semver-checks`, and
+  the [MSRV policy](./stability.md) are already in place; the remaining work
+  is the 1.0 review. Until then, minor releases may change APIs.
 - **Format freeze.** Declare the current envelope, config, and manifest
   versions stable and document the long-term compatibility promise.
 - **Operational hardening.** More crash-injection testing, cross-platform

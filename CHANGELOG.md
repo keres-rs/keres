@@ -27,6 +27,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   applications. The CLI is documented as the reference implementation.
 - The crate-level and `Vault` quick-start examples no longer call `unlock`
   immediately after `init` (which already leaves a new vault unlocked).
+- Public API hardening. `Error`, `BatchOp`, `WriteOutcome`, `Padding`,
+  `EncryptOptions`, `VaultOptions`, `EntryInfo`, `StreamInfo`,
+  `IntegrityReport`, `IndexVersion`, `KeyslotInfo`, `MigrationReport`, and
+  `RotationReport` are now `#[non_exhaustive]`, so future fields and variants
+  can be added without another breaking change. Downstream code that matched
+  these enums exhaustively or used struct literals must add a wildcard arm or
+  switch to a constructor. `IndexVersion::new` was added for the conditional
+  write APIs.
+- Constructors, getters, and builder methods whose result is easy to discard
+  by accident are now `#[must_use]`.
+- New [API stability and versioning](https://keres-rs.github.io/stability.html)
+  chapter covering the pre-1.0 policy, deprecation, MSRV, and format
+  versioning. Releases now run `cargo-semver-checks` before publishing.
 
 ### Security
 

@@ -55,6 +55,7 @@ pub const MAX_BUCKET: u64 = 16 * 1024 * 1024;
 /// but it is part of the vault's integrity-protected configuration.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Padding {
     /// No padding. Ciphertext length tracks plaintext length exactly.
     #[default]
@@ -73,6 +74,7 @@ pub enum Padding {
 
 impl Padding {
     /// Builds a fixed-bucket policy after validating `size`.
+    #[must_use = "a rejected bucket is returned as an error"]
     pub fn fixed(size: u64) -> Result<Self> {
         let padding = Self::Fixed { size };
         padding.validate()?;
@@ -80,6 +82,7 @@ impl Padding {
     }
 
     /// Whether this policy leaves payloads unpadded.
+    #[must_use]
     pub fn is_none(&self) -> bool {
         *self == Self::None
     }
@@ -100,6 +103,7 @@ impl Padding {
     ///
     /// An empty payload is padded to the smallest bucket when padding is
     /// enabled, so empty files are indistinguishable from tiny ones.
+    #[must_use = "the padded length must be used to size the output"]
     pub fn padded_len(self, len: u64) -> Result<u64> {
         match self {
             Self::None => Ok(len),
