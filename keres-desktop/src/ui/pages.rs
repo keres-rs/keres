@@ -413,17 +413,20 @@ impl App {
                 )
                 .width(Fill),
             ]
-            .spacing(16),
+            .spacing(16)
+            .align_y(iced::Alignment::Center),
             row![
                 panel("open or create", access).width(Fill),
                 panel("create options", create_options).width(Fill),
             ]
-            .spacing(16),
+            .spacing(16)
+            .align_y(iced::Alignment::Center),
             row![
                 panel("recovery kit", recovery).width(Fill),
                 panel("keyslots", keyslots).width(Fill),
             ]
-            .spacing(16),
+            .spacing(16)
+            .align_y(iced::Alignment::Center),
             panel("rotate & erase", advanced),
             status_line(&self.vt_status),
         ]
@@ -723,7 +726,8 @@ impl App {
                     panel("versions", versions).width(Fill),
                     panel("audit status", audit).width(Fill),
                 ]
-                .spacing(16),
+                .spacing(16)
+                .align_y(iced::Alignment::Center),
                 panel("security goals", guarantees),
                 panel("known limitations", limitations),
                 panel("what this application does", app),
