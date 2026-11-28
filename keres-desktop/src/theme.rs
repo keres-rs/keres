@@ -53,7 +53,7 @@ pub const MONO: Font = Font::MONOSPACE;
 static ZOOM_PERCENT: AtomicU16 = AtomicU16::new(115);
 
 pub fn set_zoom(percent: u16) {
-    ZOOM_PERCENT.store(percent.clamp(80, 160), Ordering::Relaxed);
+    ZOOM_PERCENT.store(percent.clamp(80, 300), Ordering::Relaxed);
 }
 
 #[must_use]

@@ -4,7 +4,7 @@ use crate::ui::widgets::{
     btn_g, btn_p, btn_red, btn_tiny, card, field, hline, input, panel, status_line,
 };
 use crate::vaults;
-use iced::widget::{checkbox, column, pick_list, row, slider, text, Space};
+use iced::widget::{checkbox, column, container, pick_list, row, slider, text, Space};
 use iced::Length::Fill;
 use iced::{Element, Length};
 
@@ -413,21 +413,21 @@ impl App {
                 )
                 .width(Fill),
             ]
-            .spacing(16),
+            .spacing(20),
             row![
                 panel("open or create", access).width(Fill),
                 panel("create options", create_options).width(Fill),
             ]
-            .spacing(16),
+            .spacing(20),
             row![
                 panel("recovery kit", recovery).width(Fill),
                 panel("keyslots", keyslots).width(Fill),
             ]
-            .spacing(16),
+            .spacing(20),
             panel("rotate & erase", advanced),
             status_line(&self.vt_status),
         ]
-        .spacing(14);
+        .spacing(18);
 
         page_root(self.page.title(), self.page.epigraph(), body)
     }
@@ -599,7 +599,7 @@ impl App {
                     )
                     .width(Fill),
                 ]
-                .spacing(16),
+                .spacing(20),
                 panel(
                     "save entry",
                     column![
@@ -723,7 +723,7 @@ impl App {
                     panel("versions", versions).width(Fill),
                     panel("audit status", audit).width(Fill),
                 ]
-                .spacing(16),
+                .spacing(20),
                 panel("security goals", guarantees),
                 panel("known limitations", limitations),
                 panel("what this application does", app),
@@ -756,19 +756,23 @@ fn page_root<'a>(
     epigraph: &'a str,
     content: impl Into<Element<'a, Message>>,
 ) -> Element<'a, Message> {
-    column![
-        row![
-            text("❯").size(theme::sz(16.0)).color(theme::ACCENT),
-            text(title).size(theme::sz(19.0)).color(theme::TEXT),
+    container(
+        column![
+            row![
+                text("❯").size(theme::sz(16.0)).color(theme::ACCENT),
+                text(title).size(theme::sz(19.0)).color(theme::TEXT),
+            ]
+            .align_y(iced::Alignment::Center)
+            .spacing(8),
+            text(epigraph).size(theme::sz(12.0)).color(theme::DIM),
+            Space::new().height(Length::Fixed(12.0)),
+            hline(),
+            Space::new().height(Length::Fixed(18.0)),
+            content.into(),
         ]
-        .align_y(iced::Alignment::Center)
-        .spacing(8),
-        text(epigraph).size(theme::sz(12.0)).color(theme::DIM),
-        Space::new().height(Length::Fixed(12.0)),
-        hline(),
-        Space::new().height(Length::Fixed(18.0)),
-        content.into(),
-    ]
-    .padding(24)
+        .padding(24),
+    )
+    .max_width(1180.0)
+    .center_x(Fill)
     .into()
 }

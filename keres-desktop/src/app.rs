@@ -118,7 +118,7 @@ impl Default for App {
             page: Page::Vaults,
             notice: Vec::new(),
             clipboard: None,
-            zoom: 115,
+            zoom: crate::util::load_zoom(),
             scroll_id: iced::widget::Id::unique(),
             vt_name: String::new(),
             vt_password: String::new(),
@@ -302,9 +302,18 @@ impl App {
                     },
                 );
             }
-            Message::ZoomIn => self.zoom = (self.zoom + 10).min(160),
-            Message::ZoomOut => self.zoom = self.zoom.saturating_sub(10).max(80),
-            Message::ZoomReset => self.zoom = 100,
+            Message::ZoomIn => {
+                self.zoom = (self.zoom + 10).min(300);
+                crate::util::save_zoom(self.zoom);
+            }
+            Message::ZoomOut => {
+                self.zoom = self.zoom.saturating_sub(10).max(80);
+                crate::util::save_zoom(self.zoom);
+            }
+            Message::ZoomReset => {
+                self.zoom = 115;
+                crate::util::save_zoom(self.zoom);
+            }
 
             Message::VtName(s) => {
                 self.vt_name = s;

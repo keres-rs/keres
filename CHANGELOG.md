@@ -27,7 +27,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   crypto-erasure, and a security page that states the audit status and known
   limitations. It is a separate workspace and remains outside the library's
   API contract.
-- The desktop client has navbar zoom controls (80–160%, default 115%) and a
+- The desktop client has navbar zoom controls (80–300%, default 115%) and a
   sharp-corner visual style. The generic symmetric, hash, key, and sign pages
   were removed so the storage workflows lead and the dependency tree stays
   small.

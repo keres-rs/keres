@@ -19,7 +19,7 @@ compatibility contract.
   to a temporary file.
 - Honest security UX: a page that lists the threat model, known limitations,
   and the lack of an independent audit.
-- Readability controls: the navbar scales all text from 80% to 160%, and the
+- Readability controls: the navbar scales all text from 80% to 300%, and the
   visual style uses sharp corners throughout.
 
 The app is focused on storage. The generic symmetric, hash, key, and sign

@@ -58,12 +58,15 @@ cargo clippy --offline --all-targets -- -D warnings
 ## Interface
 
 The navbar has zoom controls (`−`, `+`, `reset`) that scale all text from 80%
-to 160%. The default is 115% for readability. The visual style uses sharp
+to 300%. The default is 115% for readability. The visual style uses sharp
 corners throughout.
 
 Keyboard shortcuts: `Ctrl/Cmd+1..4` switches pages (vault, passwords,
 containers, security), and `Ctrl/Cmd` with `+`, `-`, `0` adjusts or resets the
 zoom. `Enter` submits the focused password or rename field.
+
+The zoom level is saved to `~/.keres/ui.toml` and restored on the next
+launch.
 
 ## Where data lives
 
