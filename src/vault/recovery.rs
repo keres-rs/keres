@@ -47,6 +47,7 @@ pub struct RecoveryCode(Zeroizing<String>);
 
 impl RecoveryCode {
     /// The printable code, including its group separators.
+    #[must_use]
     pub fn expose(&self) -> &str {
         self.0.as_str()
     }

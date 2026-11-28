@@ -45,6 +45,11 @@ attachment store, or a service that keeps user documents on disk.
 The `keres` command-line tool in `keres-cli/` is the reference implementation
 and a scripting/debugging aid. It uses the same format as the library.
 
+`keres-desktop/` is a Rust + iced client that embeds the library
+directly. It is a separate workspace and demonstrates the vault lifecycle,
+keyslots, recovery, migration, padding, and rotation. See
+[`keres-desktop/README.md`](keres-desktop/README.md).
+
 > **Status:** Keres is pre-1.0 (0.7.x). The container format is versioned and
 > tested, but the public API may still change. The project has not yet had an
 > independent security audit. See

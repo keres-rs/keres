@@ -49,6 +49,7 @@ const JOURNAL_VERSION: u32 = 1;
 
 /// Outcome of a successful deep rotation.
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 pub struct RotationReport {
     /// Entries rewritten under the new master key.
     pub entries: usize,

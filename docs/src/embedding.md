@@ -199,8 +199,11 @@ embedding:
   1.0 release;
 - budget for an independent security audit before storing high-value data.
 
-The format is documented so that data is not locked to this crate forever;
-see [Format test vectors](./test-vectors.md) and
+The full policy, including what minor and patch releases may change, the MSRV,
+and how `cargo-semver-checks` is enforced, is in
+[API stability and versioning](./stability.md). The format is documented so
+that data is not locked to this crate forever; see
+[Format test vectors](./test-vectors.md) and
 [Architecture](./architecture.md).
 
 ## Checklist before shipping

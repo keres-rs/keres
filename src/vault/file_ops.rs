@@ -238,7 +238,10 @@ pub(crate) fn read_entry_checked(
     }
     if let Some(expected) = &meta.content_hash {
         let actual = format!("{:x}", hasher.finalize());
-        if actual != *expected {
+        // Compare the hex digests in constant time. The manifest validator
+        // already enforces a 64-character hex string, so both sides have the
+        // same length here.
+        if !crypto::secure_compare(actual.as_bytes(), expected.as_bytes()) {
             return Err(Error::Authentication);
         }
     }

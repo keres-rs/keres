@@ -18,12 +18,13 @@
 - [Embedding Keres](./embedding.md)
 - [CLI guide](./cli-usage.md)
 - [Recovery, rotation, and migration](./operations.md)
-- [GUI (separate repository)](./gui-usage.md)
+- [Keres Desktop](./gui-usage.md)
 
 # Reference
 
 - [CLI reference](./cli-reference.md)
 - [Architecture](./architecture.md)
+- [API stability and versioning](./stability.md)
 - [Security model](./security.md)
 - [Performance](./performance.md)
 - [Format test vectors](./test-vectors.md)

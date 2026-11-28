@@ -625,6 +625,11 @@ Rules that keep the ecosystem stable:
 7. The Rust API is not stable before 1.0. The container format and on-disk
    vault layout are the compatibility contract.
 
+Open format questions are tracked in
+[Security model § Audit scope](./security.md#audit-scope). The most likely
+future envelope revision is a key-commitment tag; it would be a new envelope
+version with a documented migration path, not a reinterpretation of v1 or v2.
+
 ## Error taxonomy
 
 One enum (`Error`, via `thiserror`), with `Result<T> = std::result::Result<T, Error>`:

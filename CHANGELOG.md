@@ -20,6 +20,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `examples/in_memory.rs` and `examples/vault_store.rs` show embedded use.
 - New "Embedding Keres" book chapter covering async wrapping, key management,
   concurrency, padding, and API stability.
+- `keres-desktop/`, a Rust + iced client, now embeds the library
+  directly. It has a vault dashboard, creation options (padding and Argon2id
+  presets), in-place migration of legacy v2 vaults, entry rename/replace/
+  verify/extract/remove actions, keyslot and recovery-kit flows, rotation and
+  crypto-erasure, and a security page that states the audit status and known
+  limitations. It is a separate workspace and remains outside the library's
+  API contract.
+- The desktop client has navbar zoom controls (80–300%, default 115%) and a
+  sharp-corner visual style. The generic symmetric, hash, key, and sign pages
+  were removed so the storage workflows lead and the dependency tree stays
+  small.
 
 ### Changed
 
@@ -27,6 +38,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   applications. The CLI is documented as the reference implementation.
 - The crate-level and `Vault` quick-start examples no longer call `unlock`
   immediately after `init` (which already leaves a new vault unlocked).
+- Public API hardening. `Error`, `BatchOp`, `WriteOutcome`, `Padding`,
+  `EncryptOptions`, `VaultOptions`, `EntryInfo`, `StreamInfo`,
+  `IntegrityReport`, `IndexVersion`, `KeyslotInfo`, `MigrationReport`, and
+  `RotationReport` are now `#[non_exhaustive]`, so future fields and variants
+  can be added without another breaking change. Downstream code that matched
+  these enums exhaustively or used struct literals must add a wildcard arm or
+  switch to a constructor. `IndexVersion::new` was added for the conditional
+  write APIs.
+- Constructors, getters, and builder methods whose result is easy to discard
+  by accident are now `#[must_use]`.
+- New [API stability and versioning](https://keres-rs.github.io/stability.html)
+  chapter covering the pre-1.0 policy, deprecation, MSRV, and format
+  versioning. Releases now run `cargo-semver-checks` before publishing.
+
+### Security
+
+- Vault entry content-hash checks now compare digests in constant time.
+- Reads of `vault.config` are capped at 1 MiB, so a hostile on-disk file
+  cannot force a large allocation before parsing.
+- Clarified in the container documentation that the envelope version is bound
+  through the record AAD domain rather than key derivation; the tamper
+  property is unchanged.
+- The container fuzz target now exercises the v2 padding-header decoder
+  directly, which is otherwise gated behind a valid AEAD record.
+- The security model now documents the lack of a key-commitment tag and the
+  whole-vault rollback limitation, and defines a prioritized audit scope
+  covering the format, key hierarchy, rollback, metadata leakage, crash
+  safety, and API misuse resistance.
 
 ## [0.7.1] - 2026-11-25
 

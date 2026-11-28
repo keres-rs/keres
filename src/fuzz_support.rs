@@ -37,3 +37,12 @@ pub fn parse_manifest(input: &[u8]) -> Result<()> {
     let master = Key::from_bytes(crate::test_vectors::MASTER_KEY);
     crate::vault::manifest::decode(input, &master).map(|_| ())
 }
+
+/// Parses arbitrary bytes as a v2 padding metadata header.
+///
+/// The real decoder only runs after a padding record authenticates, so this
+/// entry point lets the fuzzer exercise the length, mode and padding-policy
+/// validation directly.
+pub fn parse_padding_header(input: &[u8]) -> Result<()> {
+    crate::container::PaddingHeader::decode(input).map(|_| ())
+}

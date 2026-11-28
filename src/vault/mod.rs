@@ -28,13 +28,17 @@
 //! ```
 
 use std::fs;
-use std::io::Write as _;
+use std::io::{Read as _, Write as _};
 use std::path::{Path, PathBuf};
 
 use crate::crypto::{self, Key};
 use crate::error::{Error, Result};
 use crate::kdf::KdfParams;
 use crate::sanitize;
+
+/// Upper bound on accepted `vault.config` JSON, guarding against a hostile
+/// on-disk file forcing a huge allocation. Real configs are a few KiB.
+const MAX_CONFIG_LEN: u64 = 1024 * 1024;
 
 pub(crate) mod file_ops;
 pub(crate) mod index_log;
@@ -79,6 +83,7 @@ use manifest::{EntryMetadata, ManifestMap};
 /// # Ok::<(), keres::Error>(())
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct VaultOptions {
     /// Size-padding policy for new entries. Defaults to [`crate::padding::Padding::None`].
     pub padding: crate::padding::Padding,
@@ -94,6 +99,7 @@ impl Default for VaultOptions {
 
 impl VaultOptions {
     /// No padding and the standard Argon2id parameters.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             padding: crate::padding::Padding::None,
@@ -102,12 +108,14 @@ impl VaultOptions {
     }
 
     /// Sets the size-padding policy.
+    #[must_use]
     pub const fn padding(mut self, padding: crate::padding::Padding) -> Self {
         self.padding = padding;
         self
     }
 
     /// Sets the Argon2id parameters.
+    #[must_use]
     pub const fn kdf(mut self, kdf: KdfParams) -> Self {
         self.kdf = kdf;
         self
@@ -169,6 +177,7 @@ impl std::fmt::Debug for Vault {
 
 /// One mutation in an explicit batch commit.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum BatchOp {
     /// Add a file or directory tree under `name` (defaults to source basename).
     Add {
@@ -196,6 +205,7 @@ pub enum BatchOp {
 /// identical index state, so a conditional write can compare against a value
 /// captured earlier to detect intervening mutations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct IndexVersion {
     /// Authenticated snapshot generation.
     pub generation: u64,
@@ -203,8 +213,24 @@ pub struct IndexVersion {
     pub records: u64,
 }
 
+impl IndexVersion {
+    /// Builds a version token from an explicit generation and record count.
+    ///
+    /// Prefer [`Vault::version`] for the current state; this constructor is
+    /// useful when a conditional write needs to compare against a known
+    /// baseline.
+    #[must_use]
+    pub const fn new(generation: u64, records: u64) -> Self {
+        Self {
+            generation,
+            records,
+        }
+    }
+}
+
 /// Outcome of a conditional write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum WriteOutcome {
     /// The mutation was applied. Carries the new index version.
     Applied {
@@ -219,6 +245,7 @@ pub enum WriteOutcome {
 }
 /// One entry as returned by [`Vault::list`].
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct EntryInfo {
     /// Full vault-relative path.
     pub name: String,
@@ -230,6 +257,7 @@ pub struct EntryInfo {
 
 /// Result of a full-integrity check.
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 pub struct IntegrityReport {
     /// Entries recorded in the manifest.
     pub total_entries: usize,
@@ -243,6 +271,7 @@ pub struct IntegrityReport {
 
 impl Vault {
     /// Creates an unattached handle for the vault at `path`.
+    #[must_use]
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
@@ -251,16 +280,19 @@ impl Vault {
     }
 
     /// Whether this path looks like an initialized vault.
+    #[must_use]
     pub fn exists(&self) -> bool {
         self.config_path().exists()
     }
 
     /// The vault's base directory.
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
 
     /// Whether the master key is currently held in memory.
+    #[must_use]
     pub fn is_unlocked(&self) -> bool {
         self.keystore.is_unlocked()
     }
@@ -270,8 +302,14 @@ impl Vault {
     }
 
     fn load_config(&self) -> Result<VaultConfig> {
-        let json = fs::read_to_string(self.config_path())?;
-        VaultConfig::parse(&json)
+        let file = fs::File::open(self.config_path())?;
+        let mut bytes = Vec::new();
+        file.take(MAX_CONFIG_LEN + 1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_CONFIG_LEN {
+            return Err(Error::InvalidVault);
+        }
+        let json = std::str::from_utf8(&bytes).map_err(|_| Error::InvalidVault)?;
+        VaultConfig::parse(json)
     }
 
     /// Serializes and atomically replaces `vault.config`.
@@ -1188,6 +1226,7 @@ impl Vault {
     }
 
     /// Whether this vault has a recovery kit on disk.
+    #[must_use]
     pub fn has_recovery_kit(&self) -> bool {
         recovery::exists(&self.path)
     }
@@ -2033,5 +2072,22 @@ mod tests {
         assert_eq!(names, vec!["a.txt"]);
         assert!(!data.join(".index.compact").exists());
         assert!(!data.join(".index.snapshot.next").exists());
+    }
+
+    #[test]
+    fn oversized_config_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut vault = Vault::new(tmp.path().join("vault"));
+        vault.init("pw").unwrap();
+
+        // Replace the config with a hostile, oversized document. The reader
+        // must reject it on size alone instead of buffering the whole file.
+        let config = vault.path().join("vault.config");
+        let mut huge = vec![b' '; MAX_CONFIG_LEN as usize + 1];
+        huge.extend_from_slice(b"{}");
+        std::fs::write(&config, huge).unwrap();
+
+        let err = vault.keyslots().unwrap_err();
+        assert!(matches!(err, Error::InvalidVault));
     }
 }
