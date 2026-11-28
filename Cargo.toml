@@ -63,7 +63,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [workspace]
 members = ["keres-cli"]
 default-members = [".", "keres-cli"]
-exclude = ["fuzz"]
+exclude = ["fuzz", "keres-desktop"]
 resolver = "2"
 
 [workspace.package]

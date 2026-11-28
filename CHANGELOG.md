@@ -20,6 +20,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `examples/in_memory.rs` and `examples/vault_store.rs` show embedded use.
 - New "Embedding Keres" book chapter covering async wrapping, key management,
   concurrency, padding, and API stability.
+- `keres-desktop/`, a Rust + iced client, now embeds the library
+  directly. It has a vault dashboard, creation options (padding and Argon2id
+  presets), in-place migration of legacy v2 vaults, entry rename/replace/
+  verify/extract/remove actions, keyslot and recovery-kit flows, rotation and
+  crypto-erasure, and a security page that states the audit status and known
+  limitations. It is a separate workspace and remains outside the library's
+  API contract.
+- The desktop client has navbar zoom controls (80–160%, default 115%) and a
+  sharp-corner visual style. The generic symmetric, hash, key, and sign pages
+  were removed so the storage workflows lead and the dependency tree stays
+  small.
 
 ### Changed
 

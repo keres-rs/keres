@@ -2,9 +2,9 @@
 
 Keres is pre-1.0 and developed security-first. The primary user is a Rust
 developer embedding the library in a local-first application; the CLI is the
-reference implementation. This page summarizes the current priorities; the
-detailed, itemized roadmap is in [docs/src/roadmap.md](docs/src/roadmap.md),
-and completed work is recorded in [CHANGELOG.md](CHANGELOG.md).
+reference implementation, and `keres-desktop/` is an in-repo consumer. This page summarizes the current priorities; the detailed, itemized
+roadmap is in [docs/src/roadmap.md](docs/src/roadmap.md), and completed work is
+recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## Before 1.0
 
@@ -19,8 +19,6 @@ and completed work is recorded in [CHANGELOG.md](CHANGELOG.md).
 - **Normative format specification.** Turn the architecture chapter and test
   vectors into a standalone document so applications are not locked to this
   crate.
-- **Flagship embedding example.** A small desktop or Tauri application that
-  stores attachments with Keres, beyond the current `examples/` programs.
 - **Memory locking.** Evaluate `mlock` and core-dump suppression behind a
   small, audited unsafe boundary. Disabled by default.
 - **Hardware-backed factors.** Optional TPM, Secure Enclave, or FIDO2

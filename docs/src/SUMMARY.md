@@ -18,7 +18,7 @@
 - [Embedding Keres](./embedding.md)
 - [CLI guide](./cli-usage.md)
 - [Recovery, rotation, and migration](./operations.md)
-- [GUI (separate repository)](./gui-usage.md)
+- [Keres Desktop](./gui-usage.md)
 
 # Reference
 
