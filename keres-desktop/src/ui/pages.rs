@@ -4,7 +4,7 @@ use crate::ui::widgets::{
     btn_g, btn_p, btn_red, btn_tiny, card, field, hline, input, panel, status_line,
 };
 use crate::vaults;
-use iced::widget::{checkbox, column, pick_list, row, slider, text, Space};
+use iced::widget::{checkbox, column, container, pick_list, row, scrollable, slider, text, Space};
 use iced::Length::Fill;
 use iced::{Element, Length};
 
@@ -101,7 +101,9 @@ impl App {
                         .into()
                     })
                     .collect();
-                column(rows).spacing(8).into()
+                scrollable(column(rows).spacing(8))
+                    .height(Length::Fixed(180.0))
+                    .into()
             }
         } else {
             text("vault locked — unlock to browse entries")
@@ -396,37 +398,49 @@ impl App {
         .spacing(10);
 
         let body = column![
-            row![
-                panel("dashboard", dashboard).width(Fill),
-                panel(
-                    "entries",
-                    column![
-                        row![
-                            text("entries").size(theme::sz(11.0)).color(theme::FAINT),
-                            Space::new().width(Fill),
-                            text(&self.vt_count).size(theme::sz(11.0)).color(theme::DIM),
-                        ],
-                        entries,
-                        entry_actions,
-                    ]
-                    .spacing(12)
-                )
-                .width(Fill),
-            ]
-            .spacing(16)
-            .align_y(iced::Alignment::Center),
-            row![
-                panel("open or create", access).width(Fill),
-                panel("create options", create_options).width(Fill),
-            ]
-            .spacing(16)
-            .align_y(iced::Alignment::Center),
-            row![
-                panel("recovery kit", recovery).width(Fill),
-                panel("keyslots", keyslots).width(Fill),
-            ]
-            .spacing(16)
-            .align_y(iced::Alignment::Center),
+            container(
+                row![
+                    panel("dashboard", dashboard).width(Fill).height(Fill),
+                    panel(
+                        "entries",
+                        column![
+                            row![
+                                text("entries").size(theme::sz(11.0)).color(theme::FAINT),
+                                Space::new().width(Fill),
+                                text(&self.vt_count).size(theme::sz(11.0)).color(theme::DIM),
+                            ],
+                            entries,
+                            entry_actions,
+                        ]
+                        .spacing(12)
+                    )
+                    .width(Fill)
+                    .height(Fill),
+                ]
+                .spacing(16)
+                .align_y(iced::Alignment::Center),
+            )
+            .height(Length::Fixed(300.0)),
+            container(
+                row![
+                    panel("open or create", access).width(Fill).height(Fill),
+                    panel("create options", create_options)
+                        .width(Fill)
+                        .height(Fill),
+                ]
+                .spacing(16)
+                .align_y(iced::Alignment::Center),
+            )
+            .height(Length::Fixed(260.0)),
+            container(
+                row![
+                    panel("recovery kit", recovery).width(Fill).height(Fill),
+                    panel("keyslots", keyslots).width(Fill).height(Fill),
+                ]
+                .spacing(16)
+                .align_y(iced::Alignment::Center),
+            )
+            .height(Length::Fixed(260.0)),
             panel("rotate & erase", advanced),
             status_line(&self.vt_status),
         ]
@@ -522,7 +536,9 @@ impl App {
                         .into()
                     })
                     .collect();
-                column(rows).spacing(8).into()
+                scrollable(column(rows).spacing(8))
+                    .height(Length::Fixed(180.0))
+                    .into()
             }
         } else {
             text("vault locked — unlock to browse entries")
@@ -722,12 +738,15 @@ impl App {
             self.page.title(),
             self.page.epigraph(),
             column![
-                row![
-                    panel("versions", versions).width(Fill),
-                    panel("audit status", audit).width(Fill),
-                ]
-                .spacing(16)
-                .align_y(iced::Alignment::Center),
+                container(
+                    row![
+                        panel("versions", versions).width(Fill).height(Fill),
+                        panel("audit status", audit).width(Fill).height(Fill),
+                    ]
+                    .spacing(16)
+                    .align_y(iced::Alignment::Center),
+                )
+                .height(Length::Fixed(200.0)),
                 panel("security goals", guarantees),
                 panel("known limitations", limitations),
                 panel("what this application does", app),
