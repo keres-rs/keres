@@ -60,6 +60,11 @@
           # winit/libxkbcommon needs the XKB data files, not just the library.
           XKB_CONFIG_ROOT = "${pkgs.xkeyboard-config}/share/X11/xkb";
 
+          # Prefer the Vulkan backend; the GLES/EGL path panics on some setups
+          # (e.g. incomplete EGL in this environment). wgpu falls back to the
+          # tiny-skia software renderer when Vulkan is unavailable.
+          WGPU_BACKEND = "vulkan";
+
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
 
           shellHook = ''
