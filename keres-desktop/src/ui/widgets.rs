@@ -17,6 +17,7 @@ pub(crate) fn panel<'a>(
         .style(theme::panel)
         .padding(18)
         .width(Fill)
+        .height(Length::Fill)
 }
 
 pub(crate) fn panel_head<'a>(s: &'a str) -> Element<'a, Message> {
