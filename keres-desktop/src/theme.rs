@@ -88,7 +88,7 @@ pub fn app_theme() -> Theme {
 pub fn panel(_theme: &Theme) -> container::Style {
     container::Style {
         background: Some(Background::Color(BG_PANEL)),
-        border: Border::default().color(BORDER_HI).width(1.0).rounded(0),
+        border: Border::default().color(BORDER).width(1.0).rounded(0),
         ..Default::default()
     }
 }
@@ -96,7 +96,7 @@ pub fn panel(_theme: &Theme) -> container::Style {
 pub fn card(_theme: &Theme) -> container::Style {
     container::Style {
         background: Some(Background::Color(BG_RAISED)),
-        border: Border::default().color(BORDER_HI).width(1.0).rounded(0),
+        border: Border::default().color(BORDER).width(1.0).rounded(0),
         ..Default::default()
     }
 }
@@ -145,7 +145,7 @@ pub fn ghost(_theme: &Theme, status: button::Status) -> button::Style {
     let base = || button::Style {
         text_color: DIM,
         background: None,
-        border: Border::default().color(BORDER_HI).width(1.0).rounded(0),
+        border: Border::default().color(BORDER).width(1.0).rounded(0),
         shadow: Shadow::default(),
         snap: false,
     };
@@ -153,7 +153,7 @@ pub fn ghost(_theme: &Theme, status: button::Status) -> button::Style {
         button::Status::Hovered => button::Style {
             text_color: TEXT,
             background: Some(Background::Color(BG_RAISED)),
-            border: Border::default().color(BORDER_HI).width(1.0).rounded(0),
+            border: Border::default().color(BORDER).width(1.0).rounded(0),
             ..base()
         },
         button::Status::Pressed => button::Style {
@@ -244,7 +244,7 @@ pub fn input_style(_theme: &Theme, status: text_input::Status) -> text_input::St
 pub fn pick_list_style(_theme: &Theme, status: pick_list::Status) -> pick_list::Style {
     let border_color = match status {
         pick_list::Status::Hovered | pick_list::Status::Opened { .. } => ACCENT,
-        pick_list::Status::Active => BORDER_HI,
+        pick_list::Status::Active => BORDER,
     };
     pick_list::Style {
         text_color: TEXT,
@@ -258,7 +258,7 @@ pub fn pick_list_style(_theme: &Theme, status: pick_list::Status) -> pick_list::
 pub fn menu_style(_theme: &Theme) -> iced::overlay::menu::Style {
     iced::overlay::menu::Style {
         background: Background::Color(BG_PANEL),
-        border: Border::default().color(BORDER_HI).width(1.0).rounded(0),
+        border: Border::default().color(BORDER).width(1.0).rounded(0),
         text_color: TEXT,
         selected_text_color: ACCENT_DARK,
         selected_background: Background::Color(ACCENT),
@@ -275,7 +275,7 @@ pub fn checkbox_style(_theme: &Theme, status: checkbox::Status) -> checkbox::Sty
     let (background, border) = if checked {
         (ACCENT, ACCENT)
     } else if enabled {
-        (BG_SUNK, BORDER_HI)
+        (BG_SUNK, BORDER)
     } else {
         (BG_RAISED, BORDER)
     };
@@ -322,7 +322,7 @@ pub fn scrollable_style(_theme: &Theme, _status: scrollable::Status) -> scrollab
         gap: None,
         auto_scroll: scrollable::AutoScroll {
             background: Background::Color(BG_PANEL),
-            border: Border::default().color(BORDER_HI).width(1.0).rounded(0),
+            border: Border::default().color(BORDER).width(1.0).rounded(0),
             shadow: Shadow::default(),
             icon: DIM,
         },

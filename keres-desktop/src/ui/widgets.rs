@@ -15,7 +15,7 @@ pub(crate) fn panel<'a>(
     children.push(content.into());
     container(column(children))
         .style(theme::panel)
-        .padding(20)
+        .padding(18)
         .width(Fill)
 }
 
